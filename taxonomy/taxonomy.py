@@ -130,7 +130,8 @@ class Taxonomy(object):
 
     @staticmethod
     def build_from_ncbi(names, nodes, names_uri, nodes_uri,
-                        ncbi_release, downloaded_date=None, directed=True):
+                        ncbi_release, downloaded_date=None, directed=True,
+                        verbose=False):
         """
         Parse an NCBI nodes.dmp and names.dmp file and build a taxonomy.
         Available from: ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdmp.zip
@@ -145,6 +146,7 @@ class Taxonomy(object):
             ncbi_release (str): NCBI release # or string
             downloaded_date (datetime): Defaults to UTC now if not specified
             directed (bool): Build a directed graph? Defaults to True
+            verbose (bool): Verbose build output. Defaults to False
 
         Returns:
             Taxonomy object built from NCBI data
@@ -192,6 +194,9 @@ class Taxonomy(object):
 
                 G.add_node(tax_id, attr_dict=attr_dict)
                 G.add_edge(tax_id, parent_tax_id)
+                if verbose and i % 1000 == 0:
+                    print ("(Line %d) Adding %s (%s) (ID: %d. Parent: %d)" %
+                           (i, names_txt, rank, tax_id, parent_tax_id))
 
         return Taxonomy(G, metadata)
 

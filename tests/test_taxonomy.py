@@ -44,7 +44,8 @@ def taxonomy_setup():
         tax = Taxonomy.build_from_ncbi(os.path.join(taxdmp_dir, "names.dmp"),
                                        os.path.join(taxdmp_dir, "nodes.dmp"),
                                        ncbi_ftp, ncbi_ftp,
-                                       "FTP Revision - See Date")
+                                       "FTP Revision - See Date",
+                                       verbose=True)
         tax.save(full_tax_path)
 
 
