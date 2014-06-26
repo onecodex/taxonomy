@@ -2,9 +2,10 @@
 Main Taxonomy object/class code.
 """
 import datetime
+import gzip
 import networkx as nx
 from networkx.readwrite import json_graph
-import gzip
+import os
 try:
     import simplejson as json
 except ImportError:
