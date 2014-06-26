@@ -175,17 +175,17 @@ class Taxonomy(object):
 
         return Taxonomy(G, metadata)
 
-    def write(self, f, gzip=True):
+    def save(self, f, compress=True):
         """
-        Write a Taxonomy object out to a taxonomy.json file
+        Save a Taxonomy object out to a taxonomy.json file
 
         Args:
             f (str, file): A filepath or file handle
 
         Kwargs:
-            gzip (bool): Compress the output? Default is True.
-                         Note: Is only used if a filepath is
-                         passed.
+            compress (bool): Gzip the output? Default is True.
+                             Note: Is only used if a filepath is
+                             passed.
 
         Returns:
             None
