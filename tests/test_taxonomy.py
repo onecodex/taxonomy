@@ -59,11 +59,9 @@ def test_small_tax_create():
                                    "Sample NCBI Revision")
 
     assert tax.__class__ is taxonomy.taxonomy.Taxonomy
-    print out_tax
     tax.save(out_tax)
 
     # Assertion on root
-    print tax.G.node[1]
     assert tax.G.node[1] == {'hidden': True, 'name': 'root',
                              'rank': 'no rank'}
 
