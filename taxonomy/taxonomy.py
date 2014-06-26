@@ -95,7 +95,7 @@ class Taxonomy(object):
         if isinstance(f, (file, gzip.GzipFile)):
             input_json = json.load(f)
         else:
-            if os.path.splitext(f)[1] in [".gz", ".gzip"]:
+            if os.path.splitext(f)[1] == ".gz":
                 input_json = json.load(gzip.open(f, mode='r'))
             else:
                 input_json = json.load(open(f, mode='r'))
@@ -197,6 +197,8 @@ class Taxonomy(object):
             json.dump(out, f)
         else:
             if gzip:
+                if os.path.splitext(f)[1] != ".gz":
+                    f = f + ".gz"
                 json.dump(out, gzip.open(f, mode='w'))
             else:
                 json.dump(out, open(f, mode='w'))
