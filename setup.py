@@ -17,7 +17,7 @@ from setuptools import setup
 
 setup(
     name='taxonomy',
-    version='0.0.0',
+    version='0.1.0',
     url='http://github.com/refgenomics/taxonomy/',
     license='All rights reserved',
     author='Nick Boyd Greenfield',
