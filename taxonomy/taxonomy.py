@@ -4,6 +4,7 @@ Main Taxonomy object/class code.
 import datetime
 import networkx as nx
 from networkx.readwrite import json_graph
+import gzip
 try:
     import simplejson as json
 except ImportError:
@@ -91,10 +92,13 @@ class Taxonomy(object):
         Returns:
             Taxonomy
         """
-        if isinstance(f, file):
+        if isinstance(f, (file, gzip.GzipFile)):
             input_json = json.load(f)
         else:
-            input_json = json.load(open(f, mode='r'))
+            if os.path.splitext(f)[1] in [".gz", ".gzip"]:
+                input_json = json.load(gzip.open(f, mode='r'))
+            else:
+                input_json = json.load(open(f, mode='r'))
         try:
             G = json_graph.node_link_graph(input_json["node_link_graph"])
             metadata = TaxonomyMetadata(**input_json["metadata"])
@@ -171,11 +175,28 @@ class Taxonomy(object):
 
         return Taxonomy(G, metadata)
 
-    def write(self, f):
+    def write(self, f, gzip=True):
+        """
+        Write a Taxonomy object out to a taxonomy.json file
+
+        Args:
+            f (str, file): A filepath or file handle
+
+        Kwargs:
+            gzip (bool): Compress the output? Default is True.
+                         Note: Is only used if a filepath is
+                         passed.
+
+        Returns:
+            None
+        """
         out = {}
         out["node_link_data"] = json_graph.node_link_data(self.G)
         out["metadata"] = self.metadata.to_json()
-        if isinstance(f, file):
+        if isinstance(f, (file, gzip.GzipFile)):
             json.dump(out, f)
         else:
-            json.dump(out, open(f, mode='w'))
+            if gzip:
+                json.dump(out, gzip.open(f, mode='w'))
+            else:
+                json.dump(out, open(f, mode='w'))
