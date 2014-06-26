@@ -162,7 +162,7 @@ class Taxonomy(object):
             _ = names_file.readline()  # Discard header
             for i, line in enumerate(names_file):
                 line = line.strip().split("\t|\t")
-                tax_id = line[0].strip()
+                tax_id = int(line[0].strip())
                 name_txt = line[1].strip()
                 name_type = line[3].rstrip("\t|")
                 if name_type == 'scientific name':
