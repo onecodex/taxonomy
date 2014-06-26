@@ -1,5 +1,5 @@
 test:
   override:
     - nosetests
-    	timeout: 500
+        timeout: 500
 
