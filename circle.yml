@@ -1,3 +1,7 @@
+dependencies:
+  cache_directories:
+    - "sample_data"
+
 test:
   override:
     - nosetests:
