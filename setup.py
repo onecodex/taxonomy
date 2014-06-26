@@ -25,7 +25,6 @@ setup(
     description='Graph-based taxonomy objects for genomics',
     long_description=__doc__,
     packages=['taxonomy'],
-    package_data={'taxonomy': ['sample_data/*.sqlite', 'sample_data/*.md']},
     zip_safe=True,
     platforms='any',
     install_requires=[
