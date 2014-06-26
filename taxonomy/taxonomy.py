@@ -31,13 +31,29 @@ class TaxonomyMetadata(object):
 
     Kwargs:
         downloaded_date (datetime): Defaults to UTC now if not specified
+        names_md5 (str): Precomputed MD5 checksum for input file.
+                         Only use if known. Will otherwise be calculated.
+        nodes_md5 (str): Same as names_md5 but for nodes.dmp
     """
     def __init__(self, names_file, nodes_file, names_uri, nodes_uri,
-                 ncbi_release, downloaded_date=None):
+                 ncbi_release, downloaded_date=None,
+                 names_md5=None, nodes_md5=None):
         self.names_uri = names_uri
         self.nodes_uri = nodes_uri
-        self.names_md5 = md5_for_file(names_file)
-        self.nodes_md5 = md5_for_file(nodes_file)
+        if names_md5 is not None:
+            self.names_md5 = names_md5
+        elif names_file is not None:
+            self.names_md5 = md5_for_file(names_file)
+        else:
+            raise TaxonomyException("Need to pass an md5 hash or a file.")
+
+        if nodes_md5 is not None:
+            self.nodes_md5 = nodes_md5
+        elif nodes_file is not None:
+            self.nodes_md5 = md5_for_file(nodes_file)
+        else:
+            raise TaxonomyException("Need to pass an md5 hash or a file.")
+
         self.ncbi_release = ncbi_release
         if downloaded_date is None:
             self.downloaded_date = datetime.datetime.utcnow().strftime(
@@ -52,14 +68,17 @@ class TaxonomyMetadata(object):
                 (self.names_uri, self.nodes_uri,
                  self.ncbi_release, self.downloaded_date))
 
+    def to_dict(self):
+        return {"names_uri": self.names_uri,
+                "nodes_uri": self.nodes_uri,
+                "names_md5": self.names_md5,
+                "nodes_md5": self.nodes_md5,
+                "ncbi_release": self.ncbi_release,
+                "downloaded_date": self.downloaded_date
+                }
+
     def to_json(self):
-        return json.dumps({"names_uri": self.names_uri,
-                           "nodes_uri": self.nodes_uri,
-                           "names_md5": self.names_md5,
-                           "nodes_md5": self.nodes_md5,
-                           "ncbi_release": self.ncbi_release,
-                           "downloaded_date": self.downloaded_date
-                           })
+        return json.dumps(self.to_dict())
 
 
 class Taxonomy(object):
@@ -101,8 +120,8 @@ class Taxonomy(object):
             else:
                 input_json = json.load(open(f, mode='r'))
         try:
-            G = json_graph.node_link_graph(input_json["node_link_graph"])
-            metadata = TaxonomyMetadata(**input_json["metadata"])
+            G = json_graph.node_link_graph(input_json["node_link_data"])
+            metadata = TaxonomyMetadata(None, None, **input_json["metadata"])
         except KeyError:
             raise TaxonomyException("Improper input. Expects a JSON blob "
                                     "with node_link_graph and metadata "
@@ -193,7 +212,7 @@ class Taxonomy(object):
         """
         out = {}
         out["node_link_data"] = json_graph.node_link_data(self.G)
-        out["metadata"] = self.metadata.to_json()
+        out["metadata"] = self.metadata.to_dict()
         if isinstance(f, (file, gzip.GzipFile)):
             json.dump(out, f)
         else:
