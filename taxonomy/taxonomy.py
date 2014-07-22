@@ -100,6 +100,17 @@ class Taxonomy(object):
         return ("Taxonomy object.\n"
                 "Metadata: \n%s" % self.metadata)
 
+    @classmethod
+    def _read_json(cls, f):
+        if isinstance(f, (file, gzip.GzipFile)):
+            input_json = json.load(f)
+        else:
+            if os.path.splitext(f)[1] == ".gz":
+                input_json = json.load(gzip.open(f, mode='r'))
+            else:
+                input_json = json.load(open(f, mode='r'))
+        return input_json
+
     @staticmethod
     def load(f):
         """
@@ -112,13 +123,30 @@ class Taxonomy(object):
         Returns:
             Taxonomy
         """
-        if isinstance(f, (file, gzip.GzipFile)):
-            input_json = json.load(f)
-        else:
-            if os.path.splitext(f)[1] == ".gz":
-                input_json = json.load(gzip.open(f, mode='r'))
-            else:
-                input_json = json.load(open(f, mode='r'))
+        input_json = Taxonomy._read_json(f)
+        try:
+            G = json_graph.node_link_graph(input_json["node_link_data"])
+            metadata = TaxonomyMetadata(None, None, **input_json["metadata"])
+        except KeyError:
+            raise TaxonomyException("Improper input. Expects a JSON blob "
+                                    "with node_link_graph and metadata "
+                                    "parent nodes")
+        return Taxonomy(G, metadata)
+
+    @staticmethod
+    def load_from_build_json(f):
+        """
+        Load a Taxonomy from a build.json file
+
+        Args:
+            f (str, file): A filepath or file handle pointing to
+                           a build.json file, which must have a 
+                           "taxonomy" key.
+
+        Returns:
+            Taxonomy
+        """
+        input_json = Taxonomy._read_json(f)["taxonomy"]
         try:
             G = json_graph.node_link_graph(input_json["node_link_data"])
             metadata = TaxonomyMetadata(None, None, **input_json["metadata"])
