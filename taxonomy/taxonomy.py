@@ -102,7 +102,9 @@ class Taxonomy(object):
 
     @classmethod
     def _read_json(cls, f):
-        if isinstance(f, (file, gzip.GzipFile)):
+        if isinstance(f, dict):
+            return f
+        elif isinstance(f, (file, gzip.GzipFile)):
             input_json = json.load(f)
         else:
             if os.path.splitext(f)[1] == ".gz":
@@ -118,7 +120,7 @@ class Taxonomy(object):
 
         Args:
             f (str, file): A filepath or file handle pointing to
-                           a taxonomy.json file
+                           a taxonomy.json file (or an already loaded dict)
 
         Returns:
             Taxonomy
@@ -140,8 +142,8 @@ class Taxonomy(object):
 
         Args:
             f (str, file): A filepath or file handle pointing to
-                           a build.json file, which must have a 
-                           "taxonomy" key.
+                           a build.json file, which must have a
+                           "taxonomy" key (or an already loaded dict).
 
         Returns:
             Taxonomy
@@ -189,7 +191,7 @@ class Taxonomy(object):
         #    tax IDs -> scientific names
         names_dict = {}
         with open(names, mode='r') as names_file:
-            _ = names_file.readline()  # Discard header
+            names_file.readline()  # Discard header
             for i, line in enumerate(names_file):
                 line = line.strip().split("\t|\t")
                 tax_id = int(line[0].strip())
