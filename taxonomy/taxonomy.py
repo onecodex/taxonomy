@@ -210,6 +210,9 @@ class Taxonomy(object):
                 line = line.split("\t|\t")
                 tax_id = int(line[0].strip())
                 parent_tax_id = int(line[1].strip())
+                if tax_id == parent_tax_id:
+                    print "Error-- tax_id==parent_tax_id; skipping this loop."
+                    continue
                 rank = line[2].strip()
                 names_txt = names_dict.get(tax_id, "No name found.")
                 hidden = line[10].strip()
