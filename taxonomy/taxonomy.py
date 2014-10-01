@@ -212,9 +212,6 @@ class Taxonomy(object):
                 line = line.split("\t|\t")
                 tax_id = int(line[0].strip())
                 parent_tax_id = int(line[1].strip())
-                if tax_id == parent_tax_id:
-                    print "Error-- tax_id==parent_tax_id; skipping this loop."
-                    continue
                 rank = line[2].strip()
                 names_txt = names_dict.get(tax_id, "No name found.")
                 hidden = line[10].strip()
@@ -226,6 +223,10 @@ class Taxonomy(object):
                 }
 
                 G.add_node(tax_id, attr_dict=attr_dict)
+                if tax_id == parent_tax_id:
+                    print "tax_id==parent_tax_id; only adding the node, not an edge."
+                    continue
+
                 G.add_edge(tax_id, parent_tax_id)
                 if verbose and i % 1000 == 0:
                     print ("(Line %d) Adding %s (%s) (ID: %d. Parent: %d)" %

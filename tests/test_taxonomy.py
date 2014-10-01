@@ -65,6 +65,9 @@ def test_small_tax_create():
     assert tax.G.node[1] == {'hidden': True, 'name': 'root',
                              'rank': 'no rank'}
 
+    # Make sure the root doesn't link to itself (regression test)
+    assert not tax.G[1]
+
     # Check that files are properly output
     assert not os.path.exists(out_tax)
     assert os.path.exists(out_tax + ".gz")  # auto-append works
