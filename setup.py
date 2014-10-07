@@ -21,7 +21,7 @@ setup(
     url='http://github.com/refgenomics/taxonomy/',
     license='All rights reserved',
     author='Nick Boyd Greenfield',
-    author_email='nickd@refgenomics.com',
+    author_email='nick@refgenomics.com',
     description='Graph-based taxonomy objects for genomics',
     long_description=__doc__,
     packages=['taxonomy'],
