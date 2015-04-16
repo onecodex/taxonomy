@@ -11,7 +11,7 @@ try:
 except ImportError:
     import json
 
-from .helpers import md5_for_file
+from helpers import md5_for_file
 
 
 class TaxonomyException(Exception):
