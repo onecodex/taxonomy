@@ -1,6 +1,7 @@
 """
 Main Taxonomy object/class code.
 """
+from __future__ import print_function
 import datetime
 import gzip
 import networkx as nx
@@ -224,13 +225,13 @@ class Taxonomy(object):
 
                 G.add_node(tax_id, attr_dict=attr_dict)
                 if tax_id == parent_tax_id:
-                    print "tax_id==parent_tax_id; only adding the node, not an edge."
+                    print("tax_id==parent_tax_id; only adding the node, not an edge.")
                     continue
 
                 G.add_edge(tax_id, parent_tax_id)
                 if verbose and i % 1000 == 0:
-                    print ("(Line %d) Adding %s (%s) (ID: %d. Parent: %d)" %
-                           (i, names_txt, rank, tax_id, parent_tax_id))
+                    print("(Line %d) Adding %s (%s) (ID: %d. Parent: %d)" %
+                          (i, names_txt, rank, tax_id, parent_tax_id))
 
         return Taxonomy(G, metadata)
 
