@@ -1,4 +1,8 @@
+.cache/
 *.pyc
 venv/*
 .DS_Store
 sample_data/*
+
+.eggs/
+taxonomy.egg-info/

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 ``taxonomy``
 ---------
@@ -17,8 +18,8 @@ from setuptools import setup
 
 setup(
     name='taxonomy',
-    version='0.1.1',
-    url='http://github.com/refgenomics/taxonomy/',
+    version='0.2.0',
+    url='http://github.com/onecodex/taxonomy/',
     license='All rights reserved',
     author='Nick Boyd Greenfield',
     author_email='nick@refgenomics.com',
@@ -29,8 +30,7 @@ setup(
     platforms='any',
     install_requires=[
         'networkx>=1.9',
-        'pandas>=0.14',
-        'nose>=1.3.3'
     ],
-    test_suite='nose.collector'
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest'],
 )

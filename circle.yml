@@ -1,9 +1,3 @@
-dependencies:
-  cache_directories:
-    - "sample_data"
-
 test:
   override:
-    - nosetests:
-        timeout: 500
-
+    - ./setup.py pytest

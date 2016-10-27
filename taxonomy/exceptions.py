@@ -1,0 +1,2 @@
+class TaxonomyException(Exception):
+    pass
