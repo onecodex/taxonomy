@@ -30,7 +30,6 @@ setup(
     platforms='any',
     install_requires=[
         'networkx>=1.9',
+        'pytest==3.0.3',
     ],
-    setup_requires=['pytest-runner'],
-    tests_require=['pytest'],
 )

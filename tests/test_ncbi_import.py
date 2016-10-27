@@ -51,7 +51,7 @@ from taxonomy.formats import taxonomy_from_ncbi
 
 
 def test_small_tax_create():
-    out_tax = os.path.join(os.getcwd(), 'sample_data/small_tax.json')
+    out_tax = os.path.join(os.getcwd(), 'small_tax.json')
     names_head = os.path.join(os.getcwd(), 'tests/sample_ncbi_data/names.1000.dmp')
     nodes_head = os.path.join(os.getcwd(), 'tests/sample_ncbi_data/nodes.1000.dmp')
     tax = taxonomy_from_ncbi(names_head, nodes_head, 'Sample NCBI Revision')
