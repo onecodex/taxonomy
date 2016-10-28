@@ -19,9 +19,13 @@ def taxonomy_from_build_json(f):
         Taxonomy
     """
     input_json = read_json(f).get('taxonomy')
+    node_link_data = input_json['node_link_data']
+    # make sure all the tax ids have been coerced into strings
+    for i in range(len(node_link_data['nodes'])):
+        node_link_data['nodes'][i]['id'] = str(node_link_data['nodes'][i]['id'])
 
     try:
-        tax_graph = json_graph.node_link_graph(input_json['node_link_data'])
+        tax_graph = json_graph.node_link_graph(node_link_data)
         metadata = input_json.get('metadata', {})
     except KeyError:
         raise TaxonomyException("Improper input. Expects a JSON blob "
