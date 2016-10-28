@@ -9,3 +9,4 @@ def test_import_build_json():
 
     assert tax.parents('9606') == ['3', '1']
     assert set(tax.children('1')) == {'2', '3'}
+    assert tax.lowest_common_ancestor('1416776', '1363') == '2'
