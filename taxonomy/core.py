@@ -117,15 +117,25 @@ class Taxonomy(object):
         return list(networkx.dfs_preorder_nodes(self.tax_graph, tax_id))[1:]
 
     def lowest_common_ancestor(self, *tax_ids):
+        len_tax_ids = len(tax_ids)
+        if len_tax_ids == 0:
+            return None
+        elif len_tax_ids == 1:
+            return tax_ids[0]
+
         if not all(self.tax_graph.has_node(tax_id) for tax_id in tax_ids):
             raise KeyError('Tax IDs {} not in taxonomy'.format(','.join(str(t) for t in tax_ids)))
 
-        parent_gens = [networkx.dfs_postorder_nodes(self.tax_graph, tax_id) for tax_id in tax_ids]
+        return reduce(self._lowest_common_ancestor_double, tax_ids)
+
+    def _lowest_common_ancestor_double(self, tax_id_1, tax_id_2):
+        parent_gen_1 = networkx.dfs_postorder_nodes(self.tax_graph, tax_id_1)
+        parent_gen_2 = networkx.dfs_postorder_nodes(self.tax_graph, tax_id_2)
         parent_id = None
-        for tax_ids in itertools.izip(*parent_gens):
-            if tax_ids.count(tax_ids[0]) != len(tax_ids):
+        for ptax_id_1, ptax_id_2 in itertools.izip(parent_gen_1, parent_gen_2):
+            if ptax_id_1 != ptax_id_2:
                 break
-            parent_id = tax_ids[0]
+            parent_id = ptax_id_1
 
         # the tax_ids don't share a common parent; return None
         return parent_id
