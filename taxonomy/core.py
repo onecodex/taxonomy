@@ -129,13 +129,20 @@ class Taxonomy(object):
         return reduce(self.lowest_common_ancestor_double, tax_ids)
 
     def lowest_common_ancestor_double(self, tax_id_1, tax_id_2):
-        parent_gen_1 = networkx.dfs_postorder_nodes(self.tax_graph, tax_id_1)
-        parent_gen_2 = networkx.dfs_postorder_nodes(self.tax_graph, tax_id_2)
-        parent_id = None
-        for ptax_id_1, ptax_id_2 in itertools.izip(parent_gen_1, parent_gen_2):
-            if ptax_id_1 != ptax_id_2:
-                break
-            parent_id = ptax_id_1
+        parent_gen_1 = networkx.dfs_preorder_nodes(self.tax_graph, tax_id_1)
+        parent_gen_2 = networkx.dfs_preorder_nodes(self.tax_graph, tax_id_2)
+        parent_tax_ids1 = set()
+        parent_tax_ids2 = set()
+        for ptax_id_1, ptax_id_2 in itertools.izip_longest(parent_gen_1, parent_gen_2,
+                                                           fillvalue='1'):
+            parent_tax_ids1.add(ptax_id_1)
+            if ptax_id_2 in parent_tax_ids1:
+                return ptax_id_2
+            parent_tax_ids2.add(ptax_id_2)
+            if ptax_id_1 in parent_tax_ids2:
+                return ptax_id_1
 
         # the tax_ids don't share a common parent; return None
-        return parent_id
+        # this should basically never happen with our current taxonomy because everything shares
+        # '1' as a parent
+        return None
