@@ -126,9 +126,9 @@ class Taxonomy(object):
         if not all(self.tax_graph.has_node(tax_id) for tax_id in tax_ids):
             raise KeyError('Tax IDs {} not in taxonomy'.format(','.join(str(t) for t in tax_ids)))
 
-        return reduce(self._lowest_common_ancestor_double, tax_ids)
+        return reduce(self.lowest_common_ancestor_double, tax_ids)
 
-    def _lowest_common_ancestor_double(self, tax_id_1, tax_id_2):
+    def lowest_common_ancestor_double(self, tax_id_1, tax_id_2):
         parent_gen_1 = networkx.dfs_postorder_nodes(self.tax_graph, tax_id_1)
         parent_gen_2 = networkx.dfs_postorder_nodes(self.tax_graph, tax_id_2)
         parent_id = None
