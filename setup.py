@@ -18,18 +18,18 @@ from setuptools import setup
 
 setup(
     name='taxonomy',
-    version='0.2.0',
+    version='0.2.1',
     url='http://github.com/onecodex/taxonomy/',
     license='All rights reserved',
     author='Nick Boyd Greenfield',
-    author_email='nick@refgenomics.com',
+    author_email='nick@onecodex.com',
     description='Graph-based taxonomy objects for genomics',
     long_description=__doc__,
     packages=['taxonomy'],
     zip_safe=True,
     platforms='any',
     install_requires=[
-        'networkx>=1.9',
+        'networkx>=1.9,<2.0',
         'pytest==3.0.3',
     ],
 )
