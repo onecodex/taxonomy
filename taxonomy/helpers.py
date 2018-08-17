@@ -17,13 +17,17 @@ logger.addHandler(ch)
 def read_json(f):
     if isinstance(f, dict):
         return f
-    elif isinstance(f, (file, gzip.GzipFile)):
-        input_json = json.load(f)
+    try:
+        if isinstance(f, (file, gzip.GzipFile)):
+            return json.load(f)
+    except NameError:  # "file" doesn't exist in python 3
+        from io import IOBase
+        if isinstance(f, (IOBase, gzip.GzipFile)):
+            return json.load(f)
+    if os.path.splitext(f)[1] == '.gz':
+        input_json = json.load(gzip.open(f, mode='r'))
     else:
-        if os.path.splitext(f)[1] == '.gz':
-            input_json = json.load(gzip.open(f, mode='r'))
-        else:
-            input_json = json.load(open(f, mode='r'))
+        input_json = json.load(open(f, mode='r'))
     return input_json
 
 
