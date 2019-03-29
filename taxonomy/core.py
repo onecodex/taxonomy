@@ -2,13 +2,24 @@
 Main Taxonomy object/class code.
 """
 import gzip
-import itertools
 import networkx
 import os
+import sys
+
 try:
     import simplejson as json
 except ImportError:
     import json
+
+try:
+    from itertools import izip_longest as zip_longest
+except ImportError:
+    from itertools import zip_longest
+
+try:
+    from functools import reduce
+except ImportError:
+    pass
 
 from networkx.readwrite import json_graph
 
@@ -74,13 +85,13 @@ class Taxonomy(object):
         out = {}
         out['node_link_data'] = json_graph.node_link_data(self.tax_graph)
         out['metadata'] = self.metadata
-        if isinstance(f, (file, gzip.GzipFile)):
+        if (sys.version_info[0] == 2 and isinstance(f, (file, gzip.GzipFile))) or hasattr(f, 'write'):
             json.dump(out, f)
         else:
             if gzip:
                 if os.path.splitext(f)[1] != '.gz':
                     f = f + '.gz'
-                json.dump(out, gzip.open(f, mode='w'))
+                json.dump(out, gzip.open(f, mode='wt'))
             else:
                 json.dump(out, open(f, mode='w'))
 
@@ -133,7 +144,7 @@ class Taxonomy(object):
         parent_gen_2 = networkx.dfs_preorder_nodes(self.tax_graph, tax_id_2)
         parent_tax_ids1 = set()
         parent_tax_ids2 = set()
-        for ptax_id_1, ptax_id_2 in itertools.izip_longest(parent_gen_1, parent_gen_2,
+        for ptax_id_1, ptax_id_2 in zip_longest(parent_gen_1, parent_gen_2,
                                                            fillvalue='1'):
             parent_tax_ids1.add(ptax_id_1)
             if ptax_id_2 in parent_tax_ids1:
