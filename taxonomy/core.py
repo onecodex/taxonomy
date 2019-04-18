@@ -5,6 +5,7 @@ import gzip
 import itertools
 import networkx
 import os
+
 try:
     import simplejson as json
 except ImportError:
@@ -12,8 +13,15 @@ except ImportError:
 
 from networkx.readwrite import json_graph
 
+from functools import reduce
+
 from taxonomy.exceptions import TaxonomyException
 from taxonomy.helpers import read_json
+
+try:
+    from itertools import zip_longest
+except ImportError:
+    from itertools import izip_longest as zip_longest
 
 
 class Taxonomy(object):
@@ -133,8 +141,9 @@ class Taxonomy(object):
         parent_gen_2 = networkx.dfs_preorder_nodes(self.tax_graph, tax_id_2)
         parent_tax_ids1 = set()
         parent_tax_ids2 = set()
-        for ptax_id_1, ptax_id_2 in itertools.izip_longest(parent_gen_1, parent_gen_2,
-                                                           fillvalue='1'):
+        for ptax_id_1, ptax_id_2 in zip_longest(
+            parent_gen_1, parent_gen_2, fillvalue="1"
+        ):
             parent_tax_ids1.add(ptax_id_1)
             if ptax_id_2 in parent_tax_ids1:
                 return ptax_id_2
