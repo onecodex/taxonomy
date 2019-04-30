@@ -2,7 +2,6 @@
 //!
 //! Only enabled when `cargo build --features python` is run or when the
 //! Python API is build with `python setup.py develop`.
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::Cursor;
 use std::str::FromStr;
@@ -11,7 +10,6 @@ use pyo3::class::*;
 use pyo3::prelude::*;
 use pyo3::types::exceptions::KeyError;
 use pyo3::types::{PyBytes, PyType};
-use pyo3::AsPyRef;
 
 use crate::base::{GeneralTaxonomy, IntTaxID};
 use crate::edit::{prune_away, prune_to};
@@ -293,11 +291,6 @@ impl Taxonomy {
             nodes_left: Vec::new(),
             visited_nodes: Vec::new(),
         })
-    }
-
-    fn maximum_weighted_path(&self, weights: &PyObject) -> PyResult<(String, f64)> {
-        let weights: &HashMap<&str, f32> = PyObjectRef::extract(weights)?;
-        Ok(("".to_string(), 0.))
     }
 
     #[getter]
