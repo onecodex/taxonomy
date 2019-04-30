@@ -1,8 +1,14 @@
 .cache/
 *.pyc
-venv/*
 .DS_Store
-sample_data/*
 
+taxonomy.*.so
+/build
+/dist
 .eggs/
-taxonomy.egg-info/
+/taxonomy.egg-info
+venv/*
+
+/target
+**/*.rs.bk
+Cargo.lock
