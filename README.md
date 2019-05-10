@@ -66,6 +66,20 @@ rustup default nightly
 ./setup.py install  # (or ./setup.py develop)
 ```
 
+### Building binary wheels and pushing to PyPI
+
+```
+# For each supported Python version and architecture combination...
+## On a Mac
+python setup.py install
+python setup.py bdist_wheel
+twine upload dist/*
+
+## On Linux
+python setup.py install
+python setup.py bdist
+twine upload dist/*
+```
 
 # Other Taxonomy Libraries
 
