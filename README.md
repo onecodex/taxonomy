@@ -76,9 +76,15 @@ python setup.py bdist_wheel
 twine upload dist/*
 
 ## On Linux
-python setup.py install
-python setup.py bdist
-twine upload dist/*
+# I built the 0.3.1 wheels with a forked version of pyo3-pack; we should reevaluate the next time
+# we build wheels if we can just get this to work with rust-python.
+git clone https://github.com/onecodex/pyo3-pack
+docker run -it --rm --entrypoint /bin/bash -v .../pyo3-pack:/pyo3pack -v .../taxonomy/:/mnt konstin2/pyo3-pack
+cd /pyo3pack
+cargo install --path . --force
+cd /mnt
+rustup default nightly
+pyo3-pack build --python-feature-gate python
 ```
 
 # Other Taxonomy Libraries

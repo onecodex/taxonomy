@@ -23,7 +23,7 @@ serde_json = "1.0.26"
 [features]
 default = ["cli"]
 cli = ["clap"]
-python = ["pyo3"]
+python = ["pyo3/extension-module"]
 
 [lib]
 crate-type=["cdylib", "rlib"]
