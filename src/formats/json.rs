@@ -265,3 +265,30 @@ where
 
     Ok(tax_json)
 }
+
+#[test]
+fn test_node_link_import() {
+    use std::io::Cursor;
+
+    // try a basically empty taxonomy
+    let example = r#"{"nodes": [], "links": []}"#;
+    let tax: GeneralTaxonomy = load_json(Cursor::new(example), None).unwrap();
+    assert_eq!(Taxonomy::<usize, _>::len(&tax), 0);
+
+    // try a really minimal one to make sure everything's in the right spot
+    let example = r#"{
+        "nodes": [
+            {"id": "1", "name": "root"},
+            {"id": "2", "name": "Bacteria", "rank": "no rank"},
+            {"id": "562", "name": "Escherichia coli", "rank": "species"}
+        ],
+        "links": [
+            {"source": 1, "target": 0},
+            {"source": 2, "target": 1}
+        ]
+    }"#;
+    let tax = load_json(Cursor::new(example), None).unwrap();
+    assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
+    assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
+    assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
+}

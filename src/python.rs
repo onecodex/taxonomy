@@ -295,7 +295,7 @@ impl Taxonomy {
 
     #[getter]
     fn get_root(&self) -> PyResult<String> {
-        let root: IntTaxID = self.t.root();
+        let root: &str = self.t.root();
         Ok(root.to_string())
     }
 }

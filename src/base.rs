@@ -176,13 +176,12 @@ impl<'s> Taxonomy<'s, IntTaxID, f32> for GeneralTaxonomy {
 
     fn parent(&self, tax_id: IntTaxID) -> Result<Option<(IntTaxID, f32)>> {
         // O(1) implementation
-        if (tax_id as usize >= self.parent_ids.len()) || (tax_id == 0) {
+        if tax_id as usize >= self.parent_ids.len() {
             return Err(TaxonomyError::NoSuchKey {
                 key: tax_id.to_string(),
             }
             .into());
-        }
-        if tax_id == 0 {
+        } else if tax_id == 0 {
             return Ok(None);
         }
         Ok(Some((
