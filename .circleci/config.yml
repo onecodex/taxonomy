@@ -27,3 +27,6 @@ jobs:
       - run:
           name: Run all tests
           command: cargo test --all
+      - run:
+          name: Check if benchmark is working
+          command: cargo bench --all
