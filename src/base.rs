@@ -42,7 +42,9 @@ impl GeneralTaxonomy {
         if children && self.children_lookup == None {
             let mut children_lookup = vec![Vec::new(); self.tax_ids.len()];
             for (ix, parent_ix) in self.parent_ids.iter().enumerate() {
-                children_lookup[*parent_ix].push(ix);
+                if ix != 0 {
+                    children_lookup[*parent_ix].push(ix);
+                }
             }
 
             self.children_lookup = Some(children_lookup);

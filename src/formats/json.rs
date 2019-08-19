@@ -291,4 +291,5 @@ fn test_node_link_import() {
     assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
     assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
     assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
+    assert_eq!(Taxonomy::<usize, _>::children(&tax, 0).unwrap(), vec![1]);
 }
