@@ -27,3 +27,12 @@ python = ["pyo3/extension-module"]
 
 [lib]
 crate-type=["cdylib", "rlib"]
+bench = false
+
+[dev-dependencies]
+criterion = "^0.2"
+rand = "^0.5"
+
+[[bench]]
+name = "taxonomy"
+harness = false
