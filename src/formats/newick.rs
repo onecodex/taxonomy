@@ -153,7 +153,7 @@ where
                     .unwrap_or_else(|| buffer.len());
                 let name_dist = &buffer[cur_pos..pos];
                 let mut chunk_iter = str::from_utf8(name_dist)?
-                    .trim_end_matches(";")
+                    .trim_end_matches(';')
                     .splitn(2, |x| x == ':');
                 tax_ids[cur_node] = chunk_iter.next().unwrap_or("").to_string();
                 dists[cur_node] = chunk_iter.next().unwrap_or("1").parse()?;

@@ -8,7 +8,7 @@ use std::str::FromStr;
 
 use pyo3::class::*;
 use pyo3::prelude::*;
-use pyo3::types::exceptions::KeyError;
+// use pyo3::types::exceptions::KeyError;
 use pyo3::types::{PyBytes, PyType};
 
 use crate::base::{GeneralTaxonomy, IntTaxID};
@@ -263,28 +263,11 @@ impl Taxonomy {
     fn prune(&self, keep: Option<Vec<&str>>, remove: Option<Vec<&str>>) -> PyResult<Taxonomy> {
         let mut t = self.t.clone();
         if let Some(k) = keep {
-            let keep_ids: Result<Vec<_>, _> = k
-                .iter()
-                .map(|i| {
-                    self.t
-                        .to_internal_id(i)
-                        .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))
-                })
-                .collect();
-            t = prune_to(&t, &keep_ids?, false)
+            t = prune_to(&t, &k, false)
                 .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
         }
         if let Some(r) = remove {
-            let remove_ids: Result<Vec<_>, _> = r
-                .iter()
-                .map(|i| {
-                    self.t
-                        .to_internal_id(i)
-                        .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))
-                })
-                .collect();
-            t = prune_away(&t, &remove_ids?)
-                .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+            t = prune_away(&t, &r).map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
         }
         Ok(Taxonomy {
             t,

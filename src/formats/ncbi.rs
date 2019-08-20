@@ -76,7 +76,7 @@ where
         .iter()
         .enumerate()
         .map(|(ix, x)| {
-            tax_to_idx.get(&*x.as_str()).map(|x| *x).ok_or_else(|| {
+            tax_to_idx.get(&*x.as_str()).copied().ok_or_else(|| {
                 TaxonomyError::ImportError {
                     file: "nodes.dmp".to_string(),
                     line: ix + 1,

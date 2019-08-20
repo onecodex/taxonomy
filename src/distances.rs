@@ -11,8 +11,8 @@ use crate::Result;
 /// Given a taxonomy and a set of "weights," calculate the summed weight for
 /// every path to root. This is like `maximum_weighted_path`, but rather than
 /// just returning the _best_ path, it returns all of the paths.
-pub fn all_weighted_paths<'t, T, D, S: BuildHasher>(
-    taxonomy: &'t Taxonomy<'t, T, D>,
+pub fn all_weighted_paths<'t, T: 't, D: 't, S: BuildHasher>(
+    taxonomy: &'t impl Taxonomy<'t, T, D>,
     weights: &HashMap<T, D, S>,
 ) -> Result<Vec<(D, T)>>
 where
@@ -48,8 +48,8 @@ where
 /// itself, but only uses the weights provided. This can greatly speed up the
 /// calculation because it reduces the number of possible paths that need to
 /// be checked.
-pub fn maximum_weighted_path<'t, T, D, S: BuildHasher>(
-    taxonomy: &'t Taxonomy<'t, T, D>,
+pub fn maximum_weighted_path<'t, T: 't, D: 't, S: BuildHasher>(
+    taxonomy: &'t impl Taxonomy<'t, T, D>,
     weights: &HashMap<T, D, S>,
     take_first_in_tie: bool,
 ) -> Result<(Option<T>, D)>
@@ -94,7 +94,7 @@ where
             .into_iter()
             .try_fold(first_child, |ancestor, child| match ancestor {
                 None => Ok(None),
-                Some(a) => taxonomy.lca(a, child).map(|v| Some(v)),
+                Some(a) => taxonomy.lca(a, child).map(Some),
             })?;
     Ok((ancestor, max_score))
     // is max_score going to be a little low here because we're not counting

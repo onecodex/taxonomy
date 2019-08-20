@@ -149,11 +149,11 @@ where
 pub struct TaxonomyIterator<'t, T: 't, D: 't> {
     nodes_left: Vec<T>,
     visited_nodes: Vec<T>,
-    tax: &'t Taxonomy<'t, T, D>,
+    tax: &'t dyn Taxonomy<'t, T, D>,
 }
 
 impl<'t, T, D> TaxonomyIterator<'t, T, D> {
-    pub fn new(tax: &'t Taxonomy<'t, T, D>, root_node: T) -> Self {
+    pub fn new(tax: &'t dyn Taxonomy<'t, T, D>, root_node: T) -> Self {
         TaxonomyIterator {
             nodes_left: vec![root_node],
             visited_nodes: vec![],
