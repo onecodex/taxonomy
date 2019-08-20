@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/rust:1.34
+      - image: circleci/rust:1.37
     steps:
       - checkout
       - run:
