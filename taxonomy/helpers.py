@@ -7,7 +7,7 @@ import platform
 import sys
 
 
-logger = logging.getLogger('taxonomy')
+logger = logging.getLogger("taxonomy")
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler(sys.stdout)
 ch.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
