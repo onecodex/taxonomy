@@ -17,7 +17,7 @@ logger.addHandler(ch)
 def read_json(f):
     if isinstance(f, dict):
         return f
-    elif isinstance(f, (file, gzip.GzipFile)):
+    elif hasattr(f, "read"):
         input_json = json.load(f)
     else:
         if os.path.splitext(f)[1] == '.gz':
