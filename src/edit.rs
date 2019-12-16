@@ -41,7 +41,7 @@ where
         if dropping == 0 {
             if pre {
                 new_ids.push(node.to_string());
-                parent_ids.push(cur_lineage.last().map(|x| x-1).unwrap_or(0));
+                parent_ids.push(cur_lineage.last().map(|x| x - 1).unwrap_or(0));
                 dists.push(tax.parent(node)?.map(|x| x.1.into()).unwrap_or(0.));
                 names.push(tax.name(node)?.to_string());
                 ranks.push(tax.rank(node)?);
@@ -101,7 +101,7 @@ where
         if pre {
             if good_ids.contains(&node) {
                 new_ids.push(node.to_string());
-                parent_ids.push(cur_lineage.last().map(|x| x-1).unwrap_or(0));
+                parent_ids.push(cur_lineage.last().map(|x| x - 1).unwrap_or(0));
                 dists.push(tax.parent(node)?.map(|x| x.1.into()).unwrap_or(0.));
                 names.push(tax.name(node)?.to_string());
                 ranks.push(tax.rank(node)?);

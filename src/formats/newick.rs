@@ -185,10 +185,12 @@ fn test_load_newick() {
     use crate::taxonomy::Taxonomy;
 
     let newick_str = b"(())";
-    let tax = load_newick(&mut newick_str.as_ref());
+    let tax = load_newick(&mut newick_str.as_ref()).unwrap();
+    assert_eq!(Taxonomy::<&str, _>::len(&tax), 3);
 
     let newick_str = b"(A,B,(C,D));";
-    let tax = load_newick(&mut newick_str.as_ref());
+    let tax = load_newick(&mut newick_str.as_ref()).unwrap();
+    assert_eq!(Taxonomy::<&str, _>::len(&tax), 6);
 
     let newick_str = b"(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;";
     let tax = load_newick(&mut newick_str.as_ref()).unwrap();

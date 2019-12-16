@@ -1,5 +1,8 @@
 //! The base implementation of the Taxonomy
+use std::cmp::PartialOrd;
 use std::collections::HashMap;
+use std::fmt::{Debug, Display};
+use std::iter::Sum;
 
 use serde_derive::{Deserialize, Serialize};
 
@@ -98,6 +101,58 @@ impl GeneralTaxonomy {
         .index(true, true)
     }
 
+    pub fn from_taxonomy<'t, T: 't, D: 't>(taxonomy: &'t impl Taxonomy<'t, T, D>) -> Result<Self>
+    where
+        T: Clone + Debug + Display + PartialEq + Ord,
+        D: Clone + Debug + Ord + Into<f64> + PartialOrd + PartialEq + Sum,
+    {
+        let tax_iter = taxonomy.traverse(taxonomy.root())?;
+        let mut stack = Vec::new();
+
+        let mut tax_ids = Vec::new();
+        let mut parent_ids = Vec::new();
+        let mut parent_dists = Vec::new();
+        let mut ranks = Vec::new();
+        let mut names = Vec::new();
+
+        let mut ix = 0;
+        for (tax_id, pre) in tax_iter {
+            if !pre {
+                stack.pop();
+                continue;
+            }
+            tax_ids.push(tax_id.to_string());
+
+            names.push(taxonomy.name(tax_id.clone())?.to_string());
+            ranks.push(taxonomy.rank(tax_id.clone())?);
+
+            if let Some((_, dist)) = taxonomy.parent(tax_id.clone())? {
+                parent_dists.push(dist.into() as f32);
+                parent_ids.push(*stack.last().unwrap());
+            } else if tax_id == taxonomy.root() {
+                parent_dists.push(0.);
+                parent_ids.push(0);
+            } else {
+                return Err(TaxonomyError::MalformedTree {
+                    tax_id: tax_id.to_string(),
+                }
+                .into());
+            }
+            stack.push(ix);
+            ix += 1;
+        }
+        Ok(GeneralTaxonomy {
+            tax_ids,
+            parent_ids,
+            parent_dists,
+            ranks,
+            names,
+            tax_id_lookup: None,
+            children_lookup: None,
+        }
+        .index(true, true))
+    }
+
     /// Given an internal tax_id (an array position) return the
     /// corresponding external tax_id (e.g. a NCBI taxonomy ID).
     ///
@@ -140,6 +195,62 @@ impl GeneralTaxonomy {
                 .into())
             }
         }
+    }
+
+    pub fn drop(&mut self, tax_id: IntTaxID) -> Result<()> {
+        // don't allow deleting root because that messes up the tree structure
+        if tax_id == 0 {
+            return Err(TaxonomyError::MalformedTree { tax_id: self.tax_ids[0].clone() }.into());
+        }
+
+        // reattach all the child nodes to the parent of the deleted node
+        let node_parent = self.parent_ids[tax_id as usize];
+        let parent_dist = self.parent_dists[tax_id as usize];
+        let mut children = Vec::new();
+        for (ix, (parent, dist)) in self
+            .parent_ids
+            .iter_mut()
+            .zip(self.parent_dists.iter_mut())
+            .enumerate()
+        {
+            if *parent == tax_id {
+                *parent = node_parent;
+                *dist += parent_dist;
+                children.push(ix);
+            }
+        }
+
+        // update the cached lookup tables
+        if let Some(ref mut tax_id_lookup) = self.tax_id_lookup {
+            // note: we do this before changing the table itself just so we
+            // can do this lookup here
+            tax_id_lookup.remove(&self.tax_ids[tax_id as usize]);
+            for value in tax_id_lookup.values_mut() {
+                if *value > tax_id {
+                    *value -= 1;
+                }
+            }
+        };
+        if let Some(ref mut children_lookup) = self.children_lookup {
+            children_lookup[node_parent].extend(children);
+            children_lookup.remove(tax_id);
+        };
+
+        // and delete the node from all the other tables
+        // (note we do this last so we still have the tax id above)
+        self.tax_ids.remove(tax_id);
+        self.parent_ids.remove(tax_id);
+        self.parent_dists.remove(tax_id);
+        self.ranks.remove(tax_id);
+        self.names.remove(tax_id);
+
+        // everything after `tax_id` in parents needs to get decremented by 1
+        // because we've changed the actual array size
+        for parent in self.parent_ids.iter_mut().skip(tax_id + 1) {
+            *parent -= 1;
+        }
+
+        Ok(())
     }
 }
 
@@ -269,5 +380,31 @@ impl<'s> Taxonomy<'s, &'s str, f32> for GeneralTaxonomy {
     fn rank(&self, tax_id: &str) -> Result<Option<TaxRank>> {
         let tax_id = self.to_internal_id(&tax_id)?;
         Ok(self.ranks[tax_id])
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::taxonomy::test::MockTax;
+
+    fn create_example() -> GeneralTaxonomy {
+        GeneralTaxonomy::from_taxonomy(&MockTax).unwrap()
+    }
+
+    #[test]
+    fn test_taxonomy_conversion() {
+        let mock_tax = MockTax;
+        let general_tax = create_example();
+        assert_eq!(mock_tax.len(), Taxonomy::<&str, f32>::len(&general_tax));
+    }
+
+    #[test]
+    fn test_drop() {
+        let mut tax = create_example();
+        assert_eq!(tax.parent("1224").unwrap(), Some(("2", 1.)));
+        tax.drop(tax.to_internal_id("2").unwrap()).unwrap();
+        assert_eq!(tax.parent("1224").unwrap(), Some(("131567", 2.)));
+        assert!(tax.drop(0).is_err());
     }
 }

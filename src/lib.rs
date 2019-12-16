@@ -27,6 +27,10 @@ pub enum TaxonomyError {
         line: usize,
         msg: String,
     },
+    /// The taxonomy has an unrooted node or some other issue that breaks
+    /// the assumption its a tree
+    #[fail(display = "Taxonomy is not a tree; broken at {}", tax_id)]
+    MalformedTree { tax_id: String },
 }
 
 mod base;
