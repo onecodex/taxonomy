@@ -1,5 +1,6 @@
 .cache/
 *.pyc
+*.swp
 .DS_Store
 
 taxonomy.*.so
