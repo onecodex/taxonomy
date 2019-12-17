@@ -11,19 +11,16 @@ readme = "./README.md"
 edition = "2018"
 
 [dependencies]
-clap = { version = "2.33.0", optional = true}
 failure = "0.1.5"
 memchr = "2.2.1"
-pyo3 = { version = "0.5.0", optional = true }
+pyo3 = { version = "0.8.4", optional = true, features=["extension-module"] }
 quick-xml = "0.15.0"
 serde = "1.0.99"
 serde_derive = "1.0.99"
 serde_json = "1.0.40"
 
 [features]
-default = ["cli"]
-cli = ["clap"]
-python = ["pyo3/extension-module"]
+python = ["pyo3"]
 
 [lib]
 crate-type=["cdylib", "rlib"]
@@ -36,3 +33,6 @@ rand = "^0.5"
 [[bench]]
 name = "taxonomy"
 harness = false
+
+[package.metadata.maturin]
+classifier = ["Intended Audience :: Science/Research", "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Topic :: Scientific/Engineering :: Bio-Informatics"]

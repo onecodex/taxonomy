@@ -1,6 +1,4 @@
-#![cfg_attr(feature = "python", feature(specialization))]
 #[cfg(feature = "python")]
-#[macro_use]
 extern crate pyo3;
 
 use std::result::Result as StdResult;

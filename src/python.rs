@@ -6,9 +6,10 @@ use std::fs::File;
 use std::io::Cursor;
 use std::str::FromStr;
 
-use pyo3::class::*;
+use pyo3::class::{PyIterProtocol, PyMappingProtocol, PyObjectProtocol, PySequenceProtocol};
+use pyo3::create_exception;
+use pyo3::exceptions::KeyError;
 use pyo3::prelude::*;
-// use pyo3::types::exceptions::KeyError;
 use pyo3::types::{PyBytes, PyType};
 
 use crate::base::{GeneralTaxonomy, IntTaxID};
@@ -20,7 +21,7 @@ use crate::formats::phyloxml::load_phyloxml;
 use crate::rank::TaxRank;
 use crate::taxonomy::Taxonomy as TaxTrait;
 
-py_exception!(taxonomy, TaxonomyError, pyo3::exceptions::Exception);
+create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::Exception);
 
 /// The Taxonomy object provides the primary interface for exploring a
 /// biological taxonomy. Iterating over the Taxonomy returns all the taxonomy
@@ -111,14 +112,14 @@ impl Taxonomy {
     /// Export a Taxonomy as a JSON-encoded byte string. By default, the JSON format
     /// is a tree format unless the `as_node_link` parameter is set to True.
     #[args(as_node_link = false)]
-    fn to_json(&self, as_node_link: bool) -> PyResult<Py<PyBytes>> {
+    fn to_json(&self, as_node_link: bool) -> PyResult<PyObject> {
         let mut s = Vec::new();
         save_json::<&str, _, _, _>(&self.t, &mut s, None, as_node_link)
             .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
 
         let gil = Python::acquire_gil();
         let py = gil.python();
-        Ok(PyBytes::new(py, &s))
+        Ok(PyBytes::new(py, &s).into())
     }
 
     /// to_newick(self)
@@ -127,14 +128,14 @@ impl Taxonomy {
     /// Export a Taxonomy as a Newick-encoded byte string.
     ///
     /// Experimental.
-    fn to_newick(&self) -> PyResult<Py<PyBytes>> {
+    fn to_newick(&self) -> PyResult<PyObject> {
         let mut s = Vec::new();
         save_newick::<&str, _, _, _>(&self.t, &mut s, None)
             .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
 
         let gil = Python::acquire_gil();
         let py = gil.python();
-        Ok(PyBytes::new(py, &s))
+        Ok(PyBytes::new(py, &s).into())
     }
 
     /// parent(self, id, /, at_rank, include_dist)
@@ -164,9 +165,9 @@ impl Taxonomy {
                     .map(|o| {
                         o.map(|(i, d)| {
                             if include_dist {
-                                (i.to_string(), d).into_object(py)
+                                (i.to_string(), d).to_object(py)
                             } else {
-                                i.to_string().into_object(py)
+                                i.to_string().to_object(py)
                             }
                         })
                     })
@@ -183,9 +184,9 @@ impl Taxonomy {
                 .map(|o| {
                     o.map(|(i, d)| {
                         if include_dist {
-                            (i.to_string(), d).into_object(py)
+                            (i.to_string(), d).to_object(py)
                         } else {
-                            i.to_string().into_object(py)
+                            i.to_string().to_object(py)
                         }
                     })
                 })
@@ -276,6 +277,36 @@ impl Taxonomy {
         })
     }
 
+    /// add(self, tax_id: str)
+    /// --
+    ///
+    /// Remove the node from the tree.
+    fn remove(&mut self, tax_id: &str) -> PyResult<()> {
+        let int_id = self
+            .t
+            .to_internal_id(tax_id)
+            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))?;
+        self.t
+            .remove(int_id)
+            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        Ok(())
+    }
+
+    /// add(self, parent_id: str, tax_id: str)
+    /// --
+    ///
+    /// Add a new node to the tree at the parent provided.
+    fn add(&mut self, parent_id: &str, tax_id: &str) -> PyResult<()> {
+        let int_id = self
+            .t
+            .to_internal_id(parent_id)
+            .map_err(|_| PyErr::new::<KeyError, _>("Parent tax ID is not in taxonomy"))?;
+        self.t
+            .add(int_id, tax_id)
+            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        Ok(())
+    }
+
     #[getter]
     fn get_root(&self) -> PyResult<String> {
         let root: &str = self.t.root();
@@ -296,16 +327,33 @@ impl PyObjectProtocol for Taxonomy {
 #[pyproto]
 impl PyMappingProtocol for Taxonomy {
     fn __getitem__(&self, key: &str) -> PyResult<(String, Option<String>)> {
-        // TODO: use KeyError instead of TaxonomyError for "no key found" situations
+        let int_id = self
+            .t
+            .to_internal_id(key)
+            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))?;
         let name = self
             .t
-            .name(key)
+            .name(int_id)
             .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
         let rank = self
             .t
-            .rank(key)
+            .rank(int_id)
             .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
         Ok((name.to_string(), rank.map(|x| x.to_ncbi_rank().to_string())))
+    }
+
+    // TODO: way to set name and rank
+    // TODO: also way to set parent and parent distance?
+
+    fn __delitem__(&mut self, key: &str) -> PyResult<()> {
+        let int_id = self
+            .t
+            .to_internal_id(key)
+            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))?;
+        self.t
+            .remove(int_id)
+            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        Ok(())
     }
 
     fn __len__(&self) -> PyResult<usize> {
@@ -322,10 +370,10 @@ impl PySequenceProtocol for Taxonomy {
 
 #[pyproto]
 impl PyIterProtocol for Taxonomy {
-    fn __iter__(&mut self) -> PyResult<Self> {
+    fn __iter__(slf: PyRefMut<Self>) -> PyResult<Self> {
         Ok(Taxonomy {
-            t: self.t.clone(),
-            nodes_left: vec![TaxTrait::<IntTaxID, _>::root(&self.t)],
+            t: slf.t.clone(),
+            nodes_left: vec![TaxTrait::<IntTaxID, _>::root(&slf.t)],
             visited_nodes: Vec::new(),
         })
 
@@ -334,39 +382,39 @@ impl PyIterProtocol for Taxonomy {
 
         // let gil_guard = Python::acquire_gil();
         // let py = gil_guard.python();
-        // let inst = pyo3::AsPyRef::as_ref(self, py);
+        // let inst = pyo3::AsPyRef::as_ref(slf, py);
         // Ok(inst)
     }
 
-    fn __next__(&mut self) -> PyResult<Option<String>> {
+    fn __next__(mut slf: PyRefMut<Self>) -> PyResult<Option<String>> {
         let traverse_preorder = true;
         loop {
-            if self.nodes_left.is_empty() {
+            if slf.nodes_left.is_empty() {
                 return Ok(None);
             }
 
-            let cur_node = *self.nodes_left.last().unwrap();
+            let cur_node = *slf.nodes_left.last().unwrap();
             let node_visited = {
-                let last_visited = self.visited_nodes.last();
+                let last_visited = slf.visited_nodes.last();
                 Some(&cur_node) == last_visited
             };
             let node = if node_visited {
-                self.visited_nodes.pop();
-                self.nodes_left.pop().unwrap() // postorder
+                slf.visited_nodes.pop();
+                slf.nodes_left.pop().unwrap() // postorder
             } else {
-                self.visited_nodes.push(cur_node.clone());
-                let children = self
+                slf.visited_nodes.push(cur_node.clone());
+                let children = slf
                     .t
                     .children(cur_node)
                     .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
                 if !children.is_empty() {
-                    self.nodes_left.extend(children);
+                    slf.nodes_left.extend(children);
                 }
                 cur_node // preorder
             };
             if node_visited == !traverse_preorder {
                 return Ok(Some(
-                    self.t
+                    slf.t
                         .from_internal_id(node)
                         .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?
                         .to_string(),
@@ -376,7 +424,7 @@ impl PyIterProtocol for Taxonomy {
     }
 }
 
-#[pymodinit]
+#[pymodule]
 fn taxonomy(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Taxonomy>()?;
 

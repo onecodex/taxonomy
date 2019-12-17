@@ -197,10 +197,17 @@ impl GeneralTaxonomy {
         }
     }
 
-    pub fn drop(&mut self, tax_id: IntTaxID) -> Result<()> {
+    /// Remove a single node from the taxonomy.
+    ///
+    /// Unlike pruning the children of the node are kept, but are rejoined
+    /// onto the node's parent. The root node can not be removed
+    pub fn remove(&mut self, tax_id: IntTaxID) -> Result<()> {
         // don't allow deleting root because that messes up the tree structure
         if tax_id == 0 {
-            return Err(TaxonomyError::MalformedTree { tax_id: self.tax_ids[0].clone() }.into());
+            return Err(TaxonomyError::MalformedTree {
+                tax_id: self.tax_ids[0].clone(),
+            }
+            .into());
         }
 
         // reattach all the child nodes to the parent of the deleted node
@@ -250,6 +257,16 @@ impl GeneralTaxonomy {
             *parent -= 1;
         }
 
+        Ok(())
+    }
+
+    /// Add a new node to the taxonomy.
+    pub fn add(&mut self, parent_id: IntTaxID, tax_id: &str) -> Result<()> {
+        self.tax_ids.push(tax_id.to_string());
+        self.parent_ids.push(parent_id);
+        self.parent_dists.push(1.);
+        self.ranks.push(None);
+        self.names.push("".to_string());
         Ok(())
     }
 }
@@ -400,11 +417,11 @@ mod test {
     }
 
     #[test]
-    fn test_drop() {
+    fn test_remove() {
         let mut tax = create_example();
         assert_eq!(tax.parent("1224").unwrap(), Some(("2", 1.)));
-        tax.drop(tax.to_internal_id("2").unwrap()).unwrap();
+        tax.remove(tax.to_internal_id("2").unwrap()).unwrap();
         assert_eq!(tax.parent("1224").unwrap(), Some(("131567", 2.)));
-        assert!(tax.drop(0).is_err());
+        assert!(tax.remove(0).is_err());
     }
 }

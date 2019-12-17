@@ -63,28 +63,18 @@ curl https://sh.rustup.rs -sSf | sh
 rustup default nightly
 
 # finally, install the library
-./setup.py install  # (or ./setup.py develop)
+maturin install --cargo-extra-args="--features=python"
 ```
 
 ### Building binary wheels and pushing to PyPI
 
 ```
-# For each supported Python version and architecture combination...
-## On a Mac
-python setup.py install
-python setup.py bdist_wheel
-twine upload dist/*
+# The Mac build requires switching through a few different python versions
+maturin build --cargo-extra-args="--features=python" --release --strip
 
-## On Linux
-# I built the 0.3.1 wheels with a forked version of pyo3-pack; we should reevaluate the next time
-# we build wheels if we can just get this to work with rust-python.
-git clone https://github.com/onecodex/pyo3-pack
-docker run -it --rm --entrypoint /bin/bash -v .../pyo3-pack:/pyo3pack -v .../taxonomy/:/mnt konstin2/pyo3-pack
-cd /pyo3pack
-cargo install --path . --force
-cd /mnt
-rustup default nightly
-pyo3-pack build --python-feature-gate python
+# The linux build is automated through cross-compiling in a docker image
+docker run --rm -v $(pwd):/io konstin2/maturin:master build --cargo-extra-args="--features=python" --release --strip
+twine upload target/wheels/*
 ```
 
 # Other Taxonomy Libraries
