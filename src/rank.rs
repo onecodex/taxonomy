@@ -148,7 +148,7 @@ impl FromStr for TaxRank {
             "superkingdom" => Ok(TaxRank::Superkingdom),
             "kingdom" => Ok(TaxRank::Kingdom),
             "subkingdom" => Ok(TaxRank::Subkingdom),
-            "superphlyum" | "superphyla" => Ok(TaxRank::Superphylum),
+            "superphylum" | "superphyla" => Ok(TaxRank::Superphylum),
             "phylum" | "phyla" => Ok(TaxRank::Phylum),
             "subphylum" | "subphyla" => Ok(TaxRank::Subphylum),
             "superclass" => Ok(TaxRank::Superclass),
@@ -180,5 +180,106 @@ impl FromStr for TaxRank {
             }
             .into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use super::TaxRank;
+    use super::TaxRank::*;
+
+    static RANKS: &[super::TaxRank] = &[
+        Domain,
+        Subdomain,
+        Hyperkingdom,
+        Superkingdom,
+        Kingdom,
+        Subkingdom,
+        Infrakingdom,
+        Parvkingdom,
+        Superphylum,
+        Phylum,
+        Subphylum,
+        Infraphylum,
+        Microphylum,
+        Superclass,
+        Class,
+        Subclass,
+        Infraclass,
+        Parvclass,
+        Superdivision,
+        Division,
+        Subdivision,
+        Infradivision,
+        Superlegion,
+        Legion,
+        Sublegion,
+        Infralegion,
+        Supercohort,
+        Cohort,
+        Subcohort,
+        Infracohort,
+        Superorder,
+        Gigaorder,
+        Magnorder,
+        Grandorder,
+        Mirorder,
+        SeriesFish,
+        Order,
+        Nanorder,
+        Hypoorder,
+        Suborder,
+        Infraorder,
+        Parvorder,
+        Section,
+        Subsection,
+        Gigafamily,
+        Megafamily,
+        Grandfamily,
+        Hyperfamily,
+        Superfamily,
+        Epifamily,
+        SeriesLepidoptera,
+        GroupLepidoptera,
+        Family,
+        Subfamily,
+        Infrafamily,
+        Supertribe,
+        Tribe,
+        Subtribe,
+        Infratribe,
+        Genus,
+        Subgenus,
+        SeriesBotany,
+        SubseriesBotany,
+        SpeciesGroup,
+        SpeciesSubgroup,
+        Species,
+        Subspecies,
+        Varietas,
+        Subvarietas,
+        Forma,
+        Subforma,
+        Cultivar,
+        Breed,
+        Individual,
+        Unspecified,
+    ];
+
+    #[test]
+    fn test_ranks() {
+        for rank in RANKS.iter() {
+            let _ = rank.to_ncbi_rank();
+        }
+    }
+
+    #[test]
+    fn test_str_to_rank() {
+        for rank in RANKS.iter() {
+            let _ = TaxRank::from_str(rank.to_ncbi_rank()).unwrap();
+        }
+        assert!(TaxRank::from_str("fake_data").is_err());
     }
 }

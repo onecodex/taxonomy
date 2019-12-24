@@ -1,4 +1,4 @@
-#[cfg(feature = "python")]
+#[cfg(any(feature = "python", feature = "python_test"))]
 extern crate pyo3;
 
 use std::result::Result as StdResult;
@@ -35,7 +35,7 @@ mod base;
 pub mod distances;
 pub mod edit;
 pub mod formats;
-#[cfg(feature = "python")]
+#[cfg(any(feature = "python", feature = "python_test"))]
 pub mod python;
 mod rank;
 mod taxonomy;

@@ -16,11 +16,11 @@ pub type IntTaxID = usize;
 /// of different formats.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GeneralTaxonomy {
-    pub(crate) tax_ids: Vec<String>,
-    pub(crate) parent_ids: Vec<IntTaxID>,
-    pub(crate) parent_dists: Vec<f32>,
-    pub(crate) ranks: Vec<Option<TaxRank>>,
-    pub(crate) names: Vec<String>,
+    pub tax_ids: Vec<String>,
+    pub parent_ids: Vec<IntTaxID>,
+    pub parent_dists: Vec<f32>,
+    pub ranks: Vec<Option<TaxRank>>,
+    pub names: Vec<String>,
 
     // these are optional lookup tables to speed up some operations
     pub(crate) tax_id_lookup: Option<HashMap<String, IntTaxID>>,
@@ -129,14 +129,10 @@ impl GeneralTaxonomy {
             if let Some((_, dist)) = taxonomy.parent(tax_id.clone())? {
                 parent_dists.push(dist.into() as f32);
                 parent_ids.push(*stack.last().unwrap());
-            } else if tax_id == taxonomy.root() {
+            } else {
+                // root
                 parent_dists.push(0.);
                 parent_ids.push(0);
-            } else {
-                return Err(TaxonomyError::MalformedTree {
-                    tax_id: tax_id.to_string(),
-                }
-                .into());
             }
             stack.push(ix);
             ix += 1;
@@ -262,11 +258,21 @@ impl GeneralTaxonomy {
 
     /// Add a new node to the taxonomy.
     pub fn add(&mut self, parent_id: IntTaxID, tax_id: &str) -> Result<()> {
+        let new_int_id = self.tax_ids.len();
         self.tax_ids.push(tax_id.to_string());
         self.parent_ids.push(parent_id);
         self.parent_dists.push(1.);
         self.ranks.push(None);
         self.names.push("".to_string());
+
+        // update the cached lookup tables
+        if let Some(ref mut tax_id_lookup) = self.tax_id_lookup {
+            tax_id_lookup.insert(tax_id.to_string(), new_int_id);
+        };
+        if let Some(ref mut children_lookup) = self.children_lookup {
+            children_lookup[parent_id].push(new_int_id);
+        };
+
         Ok(())
     }
 }
@@ -401,12 +407,31 @@ impl<'s> Taxonomy<'s, &'s str, f32> for GeneralTaxonomy {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use super::*;
     use crate::taxonomy::test::MockTax;
 
-    fn create_example() -> GeneralTaxonomy {
+    pub(crate) fn create_example() -> GeneralTaxonomy {
         GeneralTaxonomy::from_taxonomy(&MockTax).unwrap()
+    }
+
+    #[test]
+    fn test_id_mapping() -> Result<()> {
+        let mut tax = create_example();
+        let int_id = tax.to_internal_id("1224")?;
+        assert_eq!(tax.from_internal_id(int_id)?, "1224");
+        assert!(tax.to_internal_id("not_an_id").is_err());
+
+        // try without the index
+        tax.tax_id_lookup = None;
+        tax.children_lookup = None;
+        let int_id = tax.to_internal_id("1224")?;
+        assert_eq!(tax.from_internal_id(int_id)?, "1224");
+        assert!(tax.to_internal_id("not_an_id").is_err());
+
+        assert_eq!(Taxonomy::<IntTaxID, _>::root(&tax), 0);
+        assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
+        Ok(())
     }
 
     #[test]
@@ -417,11 +442,98 @@ mod test {
     }
 
     #[test]
-    fn test_remove() {
+    fn test_children() -> Result<()> {
         let mut tax = create_example();
-        assert_eq!(tax.parent("1224").unwrap(), Some(("2", 1.)));
-        tax.remove(tax.to_internal_id("2").unwrap()).unwrap();
-        assert_eq!(tax.parent("1224").unwrap(), Some(("131567", 2.)));
+        let int_parent_id = tax.to_internal_id("1224")?;
+        let int_child_id = tax.to_internal_id("1236")?;
+        assert_eq!(tax.children(int_parent_id)?, vec![int_child_id]);
+        assert_eq!(tax.children("1224")?, vec!["1236"]);
+        assert_eq!(tax.parent(int_child_id)?, Some((int_parent_id, 1.)));
+        assert_eq!(tax.parent("1236")?, Some(("1224", 1.)));
+
+        // try without the index
+        tax.tax_id_lookup = None;
+        tax.children_lookup = None;
+        assert_eq!(tax.children(int_parent_id)?, vec![int_child_id]);
+        assert_eq!(tax.children("1224")?, vec!["1236"]);
+        assert_eq!(tax.parent(int_child_id)?, Some((int_parent_id, 1.)));
+        assert_eq!(tax.parent("1236")?, Some(("1224", 1.)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_access_equivalency() -> Result<()> {
+        let mut tax = create_example();
+        for id in &["1", "2", "1224", "61598"] {
+            let int_id = tax.to_internal_id(&id)?;
+            assert_eq!(tax.name(*id)?, tax.name(int_id)?);
+            assert_eq!(tax.rank(*id)?, tax.rank(int_id)?);
+            assert_eq!(
+                tax.parent(*id)?,
+                tax.parent(int_id)?
+                    .map(|(p, d)| (tax.from_internal_id(p).unwrap(), d))
+            );
+        }
+        tax.tax_id_lookup = None;
+        tax.children_lookup = None;
+        for id in &["1", "2", "1224", "61598"] {
+            let int_id = tax.to_internal_id(&id)?;
+            assert_eq!(tax.name(*id)?, tax.name(int_id)?);
+            assert_eq!(tax.rank(*id)?, tax.rank(int_id)?);
+            assert_eq!(
+                tax.parent(*id)?,
+                tax.parent(int_id)?
+                    .map(|(p, d)| (tax.from_internal_id(p).unwrap(), d))
+            );
+        }
+        assert!(tax.name("BAD").is_err());
+        assert!(tax.rank("BAD").is_err());
+        assert!(tax.name(1000).is_err());
+        assert!(tax.rank(1000).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove() -> Result<()> {
+        let mut tax = create_example();
+        assert_eq!(tax.parent("1224")?, Some(("2", 1.)));
+        tax.remove(tax.to_internal_id("2")?)?;
+        assert_eq!(tax.parent("1224")?, Some(("131567", 2.)));
+        assert!(tax.children("131567")?.contains(&"1224"));
+
+        tax.tax_id_lookup = None;
+        tax.children_lookup = None;
+        assert_eq!(tax.parent("1224")?, Some(("131567", 2.)));
+        assert!(tax.children("131567")?.contains(&"1224"));
+
+        // can't remove root
         assert!(tax.remove(0).is_err());
+
+        // check without the index initially
+        let mut tax = create_example();
+        tax.tax_id_lookup = None;
+        tax.children_lookup = None;
+        assert_eq!(tax.parent("1224")?, Some(("2", 1.)));
+        tax.remove(tax.to_internal_id("2")?)?;
+        assert_eq!(tax.parent("1224")?, Some(("131567", 2.)));
+        assert!(tax.children("131567")?.contains(&"1224"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_add() -> Result<()> {
+        let mut tax = create_example();
+        let tax_size = Taxonomy::<&str, _>::len(&tax);
+        tax.add(tax.to_internal_id("1236")?, "91347")?;
+        assert_eq!(Taxonomy::<&str, _>::len(&tax), tax_size + 1);
+        assert_eq!(tax.parent("91347")?, Some(("1236", 1.)));
+        assert!(tax.children("1236")?.contains(&"91347"));
+
+        // make sure everything works without the indicies
+        tax.tax_id_lookup = None;
+        tax.children_lookup = None;
+        assert_eq!(tax.parent("91347")?, Some(("1236", 1.)));
+        assert!(tax.children("1236")?.contains(&"91347"));
+        Ok(())
     }
 }

@@ -154,7 +154,7 @@ where
 }
 
 #[test]
-fn test_ncbi_importer() {
+fn test_ncbi_importer() -> Result<()> {
     use std::io::Cursor;
 
     let nodes = "1\t|\t1\t|\tno rank\t|\t\t|\t8\t|\t0\t|\t1\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|
@@ -216,9 +216,13 @@ fn test_ncbi_importer() {
 91347\t|\tEnterobacterales\t|\t\t|\tscientific name\t|
 131567\t|\tbiota\t|\t\t|\tsynonym\t|
 131567\t|\tcellular organisms\t|\t\t|\tscientific name\t|";
-    let tax = load_ncbi(Cursor::new(nodes), Cursor::new(names)).unwrap();
-    assert_eq!(tax.name("562").unwrap(), "Escherichia coli");
-    assert_eq!(tax.rank("562").unwrap(), Some(TaxRank::Species));
-    assert_eq!(tax.parent("562").unwrap(), Some(("561", 1.)));
-    assert_eq!(tax.children("561").unwrap(), vec!["562"]);
+    let tax = load_ncbi(Cursor::new(nodes), Cursor::new(names))?;
+    assert_eq!(tax.name("562")?, "Escherichia coli");
+    assert_eq!(tax.rank("562")?, Some(TaxRank::Species));
+    assert_eq!(tax.parent("562")?, Some(("561", 1.)));
+    assert_eq!(tax.children("561")?, vec!["562"]);
+
+    // switching the files should result in an error
+    assert!(load_ncbi(Cursor::new(names), Cursor::new(nodes)).is_err());
+    Ok(())
 }
