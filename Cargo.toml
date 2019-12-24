@@ -13,14 +13,15 @@ edition = "2018"
 [dependencies]
 failure = "0.1.5"
 memchr = "2.2.1"
-pyo3 = { version = "0.8.4", optional = true, features=["extension-module"] }
+pyo3 = { version = "0.8.4", optional = true }
 quick-xml = "0.15.0"
 serde = "1.0.99"
 serde_derive = "1.0.99"
 serde_json = "1.0.40"
 
 [features]
-python = ["pyo3"]
+python = ["pyo3/extension-module"]
+python_test = ["pyo3"]
 
 [lib]
 crate-type=["cdylib", "rlib"]

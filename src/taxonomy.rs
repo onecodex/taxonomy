@@ -66,7 +66,7 @@ where
         }
 
         // traverse up the tree looking for it
-        let mut cur_id = tax_id.clone();
+        let mut cur_id = tax_id;
         let mut dists = Vec::new();
         while let Some(p) = self.parent(cur_id)? {
             dists.push(p.1);
@@ -278,37 +278,50 @@ pub(crate) mod test {
     #[test]
     fn test_len() {
         let tax = MockTax;
+        assert_eq!(tax.root(), 1);
         assert_eq!(tax.len(), 14);
+        assert_eq!(tax.is_empty(), false);
     }
 
     #[test]
-    fn test_lca() {
+    fn test_lca() -> Result<()> {
         let tax = MockTax;
-        assert_eq!(tax.lca(56812, 22).unwrap(), 22);
-        assert_eq!(tax.lca(56812, 765909).unwrap(), 1236);
+        assert_eq!(tax.lca(56812, 22)?, 22);
+        assert_eq!(tax.lca(56812, 765909)?, 1236);
+        Ok(())
     }
 
     #[test]
-    fn test_parent_at_rank() {
+    fn test_lineage() -> Result<()> {
+        let tax = MockTax;
+        assert_eq!(tax.lineage(1)?, vec![1]);
+        assert_eq!(
+            tax.lineage(61598)?,
+            vec![61598, 53452, 1046, 135613, 1236, 1224, 2, 131567, 1]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_parent_at_rank() -> Result<()> {
         let tax = MockTax;
 
         assert_eq!(
-            tax.parent_at_rank(765909, TaxRank::Genus).unwrap(),
+            tax.parent_at_rank(765909, TaxRank::Genus)?,
             Some((53452, 2))
         );
-        assert_eq!(
-            tax.parent_at_rank(765909, TaxRank::Class).unwrap(),
-            Some((1236, 5))
-        );
+        assert_eq!(tax.parent_at_rank(765909, TaxRank::Class)?, Some((1236, 5)));
+        assert_eq!(tax.parent_at_rank(1224, TaxRank::Phylum)?, Some((1224, 0)));
+        assert_eq!(tax.parent_at_rank(1224, TaxRank::Genus)?, None,);
+        Ok(())
     }
 
     #[test]
-    fn test_traversal() {
+    fn test_traversal() -> Result<()> {
         let tax = MockTax;
         let mut visited = HashSet::new();
         let n_nodes = tax
-            .traverse(tax.root())
-            .unwrap()
+            .traverse(tax.root())?
             .enumerate()
             .map(|(ix, (tid, pre))| match ix {
                 0 => {
@@ -330,5 +343,6 @@ pub(crate) mod test {
             .count();
 
         assert_eq!(n_nodes, 28, "Each node appears twice");
+        Ok(())
     }
 }

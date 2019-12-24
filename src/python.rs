@@ -159,7 +159,7 @@ impl Taxonomy {
         let py = gil.python();
 
         if let Some(rank) = at_rank {
-            if let Some(rank) = TaxRank::from_str(rank).ok() {
+            if let Ok(rank) = TaxRank::from_str(rank) {
                 self.t
                     .parent_at_rank(id, rank)
                     .map(|o| {
@@ -201,7 +201,7 @@ impl Taxonomy {
     fn children(&self, id: &str) -> PyResult<Vec<String>> {
         self.t
             .children(id)
-            .map(|v| v.iter().map(|i| i.to_string()).collect())
+            .map(|v| v.into_iter().map(|i| i.to_string()).collect())
             .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))
     }
 
@@ -213,7 +213,7 @@ impl Taxonomy {
     fn lineage(&self, id: &str) -> PyResult<Vec<String>> {
         self.t
             .lineage(id)
-            .map(|v| v.iter().map(|i| i.to_string()).collect())
+            .map(|v| v.into_iter().map(|i| i.to_string()).collect())
             .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))
     }
 
@@ -277,7 +277,7 @@ impl Taxonomy {
         })
     }
 
-    /// add(self, tax_id: str)
+    /// remove(self, tax_id: str)
     /// --
     ///
     /// Remove the node from the tree.
@@ -429,4 +429,102 @@ fn taxonomy(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Taxonomy>()?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use pyo3::prelude::*;
+    use pyo3::types::{IntoPyDict, PyDict};
+
+    use crate::base::test::create_example;
+
+    use super::Taxonomy;
+
+    fn setup_ctx(py: Python) -> PyResult<Option<&PyDict>> {
+        let tax = Py::new(
+            py,
+            Taxonomy {
+                t: create_example(),
+                visited_nodes: vec![],
+                nodes_left: vec![],
+            },
+        )?;
+        Ok(Some([("tax", tax)].into_py_dict(py)))
+    }
+
+    #[test]
+    fn test_tree_methods() -> PyResult<()> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py)?;
+
+        let parent: String = py.eval(r#"tax.parent("53452")"#, None, ctx)?.extract()?;
+        assert_eq!(parent, "1046");
+
+        let parent: String = py
+            .eval(r#"tax.parent("53452", at_rank="phylum")"#, None, ctx)?
+            .extract()?;
+        assert_eq!(parent, "1224");
+
+        let children: Vec<String> = py.eval(r#"tax.children("53452")"#, None, ctx)?.extract()?;
+        assert_eq!(children, vec!["61598"]);
+
+        let lineage: Vec<String> = py.eval(r#"tax.lineage("1224")"#, None, ctx)?.extract()?;
+        assert_eq!(lineage, vec!["1224", "2", "131567", "1"]);
+
+        let lca: String = py
+            .eval(r#"tax.lca("56812", "765909")"#, None, ctx)?
+            .extract()?;
+        assert_eq!(lca, "1236");
+        Ok(())
+    }
+
+    #[test]
+    fn test_info_methods() -> PyResult<()> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py)?;
+
+        let name: String = py.eval(r#"tax.name("1224")"#, None, ctx)?.extract()?;
+        assert_eq!(name, "Proteobacteria");
+
+        let rank: String = py.eval(r#"tax.rank("1224")"#, None, ctx)?.extract()?;
+        assert_eq!(rank, "phylum");
+
+        let rank: (String, String) = py.eval(r#"tax["1224"]"#, None, ctx)?.extract()?;
+        assert_eq!(rank, ("Proteobacteria".to_string(), "phylum".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn test_editing() -> PyResult<()> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py)?;
+
+        py.eval(r#"tax.add("1236", "91347")"#, None, ctx)?;
+        py.eval(r#"tax.remove("135622")"#, None, ctx)?;
+        // TODO: get these working?
+        // py.eval(r#"tax.prune("22")"#, None, ctx)?;
+        // py.eval(r#"del tax["1046"]"#, None, ctx)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_iteration() -> PyResult<()> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py)?;
+
+        let n_nodes: u64 = py.eval(r#"len(tax)"#, None, ctx)?.extract()?;
+        assert_eq!(n_nodes, 14);
+
+        let n_nodes: u64 = py.eval(r#"len([t for t in tax])"#, None, ctx)?.extract()?;
+        assert_eq!(n_nodes, 14);
+
+        let contained: bool = py.eval(r#""1224" in tax"#, None, ctx)?.extract()?;
+        assert_eq!(contained, true);
+        Ok(())
+    }
 }

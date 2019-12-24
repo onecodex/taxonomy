@@ -173,60 +173,76 @@ where
     ))
 }
 
-#[test]
-fn test_load_phyloxml() {
+#[cfg(test)]
+mod test {
     use std::io::Cursor;
 
-    let text_xml = r#"
-    <phylogeny rooted="true">
-      <name>test taxonomy</name>
-      <clade>
-        <id>E</id>
-        <clade>
-          <id>D</id>
-          <branch_length>0.3</branch_length>
-          <clade>
-            <name>A</name>
-            <id>A</id>
-            <branch_length>0.1</branch_length>
-          </clade>
-          <clade>
-            <name>B</name>
-            <id>B</id>
-            <branch_length>0.2</branch_length>
-          </clade>
-        </clade>
-        <clade>
-          <name>C</name>
-          <id>C</id>
-          <branch_length>0.4</branch_length>
-        </clade>
-      </clade>
-    </phylogeny>
-    "#;
-    let mut text_cursor = Cursor::new(text_xml);
-    let tax = load_phyloxml(&mut text_cursor).unwrap();
-    assert_eq!(Taxonomy::<&str, f32>::len(&tax), 5);
+    use super::*;
 
-    let text_xml = r#"
-    <phylogeny rooted="true">
-       <name>test taxonomy</name>
-       <clade>
-          <clade branch_length="0.3">
-             <clade branch_length="0.1">
+    #[test]
+    fn test_load_phyloxml() -> Result<()> {
+        let text_xml = r#"
+        <phylogeny rooted="true">
+          <name>test taxonomy</name>
+          <clade>
+            <id>E</id>
+            <clade>
+              <id>D</id>
+              <branch_length>0.3</branch_length>
+              <clade>
                 <name>A</name>
-             </clade>
-             <clade branch_length="0.2">
+                <id>A</id>
+                <branch_length>0.1</branch_length>
+              </clade>
+              <clade>
                 <name>B</name>
-             </clade>
+                <id>B</id>
+                <branch_length>0.2</branch_length>
+              </clade>
+            </clade>
+            <clade>
+              <name>C</name>
+              <id>C</id>
+              <branch_length>0.4</branch_length>
+            </clade>
           </clade>
-          <clade branch_length="0.4">
-             <name>C</name>
-          </clade>
-       </clade>
-    </phylogeny>
-    "#;
-    let mut text_cursor = Cursor::new(text_xml);
-    let tax = load_phyloxml(&mut text_cursor).unwrap();
-    assert_eq!(Taxonomy::<&str, f32>::len(&tax), 5);
+        </phylogeny>
+        "#;
+        let mut text_cursor = Cursor::new(text_xml);
+        let tax = load_phyloxml(&mut text_cursor)?;
+        assert_eq!(Taxonomy::<&str, f32>::len(&tax), 5);
+
+        let text_xml = r#"
+        <phylogeny rooted="true">
+           <name>test taxonomy</name>
+           <clade>
+              <clade branch_length="0.3">
+                 <clade branch_length="0.1">
+                    <name>A</name>
+                 </clade>
+                 <clade branch_length="0.2">
+                    <name>B</name>
+                 </clade>
+              </clade>
+              <clade branch_length="0.4">
+                 <name>C</name>
+              </clade>
+           </clade>
+        </phylogeny>
+        "#;
+        let mut text_cursor = Cursor::new(text_xml);
+        let tax = load_phyloxml(&mut text_cursor)?;
+        assert_eq!(Taxonomy::<&str, f32>::len(&tax), 5);
+        Ok(())
+    }
+
+    #[test]
+    fn test_no_valid_phyloxml() -> Result<()> {
+        let text_xml = r#"
+        <document></document>
+        "#;
+        let mut text_cursor = Cursor::new(text_xml);
+        assert!(load_phyloxml(&mut text_cursor).is_err());
+        Ok(())
+    }
 }

@@ -67,9 +67,12 @@ pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         .ok_or_else(|| format_err!("'nodes' not in JSON"))?;
     let mut parent_ids = vec![0; tax_nodes.len()];
     for l in tax_links {
-        // TODO: some error messages for these unwraps
-        let source = l["source"].as_u64().unwrap() as usize;
-        let target = l["target"].as_u64().unwrap() as usize;
+        let source = l["source"]
+            .as_u64()
+            .ok_or_else(|| format_err!("link source is bad"))? as usize;
+        let target = l["target"]
+            .as_u64()
+            .ok_or_else(|| format_err!("link target is bad"))? as usize;
         parent_ids[source] = target;
     }
 
@@ -123,19 +126,28 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         names: &mut Vec<String>,
         ranks: &mut Vec<Option<TaxRank>>,
     ) -> Result<()> {
-        let tax_id = node["id"].to_string();
-        tax_ids.push(tax_id.clone());
-        parent_ids.push(parent_loc);
-        names.push(
-            node["name"]
-                .as_str()
-                .ok_or_else(|| format_err!("Name for {} not a string", tax_id))?
-                .to_string(),
-        );
-        let rank = node["rank"]
+        let tax_id = node["id"]
             .as_str()
-            .ok_or_else(|| format_err!("Rank for {} is not a string", tax_id))?;
-        ranks.push(TaxRank::from_str(rank).ok());
+            .ok_or_else(|| format_err!("All entries need IDs"))?;
+        tax_ids.push(tax_id.to_string());
+        parent_ids.push(parent_loc);
+        if let Some(name) = node.get("name") {
+            names.push(
+                name.as_str()
+                    .ok_or_else(|| format_err!("Name for {} not a string", tax_id))?
+                    .to_string(),
+            );
+        } else {
+            names.push("".to_string());
+        }
+        if let Some(rank) = node.get("rank") {
+            let str_rank = rank
+                .as_str()
+                .ok_or_else(|| format_err!("Rank for {} is not a string", tax_id))?;
+            ranks.push(TaxRank::from_str(str_rank).ok());
+        } else {
+            ranks.push(None);
+        }
 
         let loc = tax_ids.len() - 1;
         if let Some(children) = node.get("children") {
@@ -266,30 +278,98 @@ where
     Ok(tax_json)
 }
 
-#[test]
-fn test_node_link_import() {
+#[cfg(test)]
+mod test {
     use std::io::Cursor;
 
-    // try a basically empty taxonomy
-    let example = r#"{"nodes": [], "links": []}"#;
-    let tax: GeneralTaxonomy = load_json(Cursor::new(example), None).unwrap();
-    assert_eq!(Taxonomy::<usize, _>::len(&tax), 0);
+    use crate::taxonomy::test::MockTax;
 
-    // try a really minimal one to make sure everything's in the right spot
-    let example = r#"{
-        "nodes": [
-            {"id": "1", "name": "root"},
-            {"id": "2", "name": "Bacteria", "rank": "no rank"},
-            {"id": "562", "name": "Escherichia coli", "rank": "species"}
-        ],
-        "links": [
-            {"source": 1, "target": 0},
-            {"source": 2, "target": 1}
-        ]
-    }"#;
-    let tax = load_json(Cursor::new(example), None).unwrap();
-    assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
-    assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
-    assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
-    assert_eq!(Taxonomy::<usize, _>::children(&tax, 0).unwrap(), vec![1]);
+    use super::*;
+
+    #[test]
+    fn test_node_link_import() -> Result<()> {
+        // try a basically empty taxonomy
+        let example = r#"{"nodes": [], "links": []}"#;
+        let tax: GeneralTaxonomy = load_json(Cursor::new(example), None)?;
+        assert_eq!(Taxonomy::<usize, _>::len(&tax), 0);
+
+        // try a really minimal one to make sure everything's in the right spot
+        let example = r#"{
+            "nodes": [
+                {"id": "1", "name": "root"},
+                {"id": "2", "name": "Bacteria", "rank": "no rank"},
+                {"id": "562", "name": "Escherichia coli", "rank": "species"}
+            ],
+            "links": [
+                {"source": 1, "target": 0},
+                {"source": 2, "target": 1}
+            ]
+        }"#;
+        let tax = load_json(Cursor::new(example), None)?;
+        assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
+        assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
+        assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
+        assert_eq!(Taxonomy::<usize, _>::children(&tax, 0)?, vec![1]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_import() -> Result<()> {
+        // try a basically empty taxonomy
+        let example = r#"{"id": "1"}"#;
+        let tax: GeneralTaxonomy = load_json(Cursor::new(example), None)?;
+        assert_eq!(Taxonomy::<usize, _>::len(&tax), 1);
+
+        // try a really minimal one to make sure everything's in the right spot
+        let example = r#"{
+            "id": "1",
+            "name": "root",
+            "rank": "no rank",
+            "children": [
+                {
+                    "id": "2",
+                    "name": "Bacteria",
+                    "rank": "no rank",
+                    "children": [
+                        {
+                            "id": "562",
+                            "name": "Escherichia coli",
+                            "rank": "species",
+                            "children": []
+                        }
+                    ]
+                }
+            ]
+        }"#;
+        let tax = load_json(Cursor::new(example), None)?;
+        assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
+        assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
+        assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
+        assert_eq!(Taxonomy::<usize, _>::children(&tax, 0)?, vec![1]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_key_retrieval() -> Result<()> {
+        let example = r#"{"test": {"sub": {"nodes": [], "links": []}}}"#;
+        let tax: GeneralTaxonomy = load_json(Cursor::new(example), Some("test.sub"))?;
+        assert_eq!(Taxonomy::<usize, _>::len(&tax), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_tree_save() -> Result<()> {
+        let mut s: Vec<u8> = Vec::new();
+        save_json(&MockTax, &mut s, None, false)?;
+        assert_eq!(s[0], b'{');
+        Ok(())
+    }
+
+    #[test]
+    fn test_node_link_save() -> Result<()> {
+        let mut s: Vec<u8> = Vec::new();
+        save_json(&MockTax, &mut s, None, true)?;
+        assert_eq!(s[0], b'{');
+        Ok(())
+    }
 }

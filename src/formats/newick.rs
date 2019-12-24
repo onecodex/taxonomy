@@ -171,29 +171,42 @@ where
     ))
 }
 
-#[test]
-fn test_write_newick() {
+#[cfg(test)]
+mod test {
     use crate::taxonomy::test::MockTax;
-    let tax = MockTax;
-    let mut s: Vec<u8> = Vec::new();
-    save_newick(&tax, &mut s, None).unwrap();
-    assert_eq!(s, b"(((((((((765909:1)61598:1)53452:1)1046:1)135613:1,(((56812:1)62322:1)22:1)135622:1)1236:1)1224:1)2:1)131567:1)1;".to_vec());
-}
-
-#[test]
-fn test_load_newick() {
     use crate::taxonomy::Taxonomy;
 
-    let newick_str = b"(())";
-    let tax = load_newick(&mut newick_str.as_ref()).unwrap();
-    assert_eq!(Taxonomy::<&str, _>::len(&tax), 3);
+    use super::*;
 
-    let newick_str = b"(A,B,(C,D));";
-    let tax = load_newick(&mut newick_str.as_ref()).unwrap();
-    assert_eq!(Taxonomy::<&str, _>::len(&tax), 6);
+    #[test]
+    fn test_write_newick() -> Result<()> {
+        let tax = MockTax;
+        let mut s: Vec<u8> = Vec::new();
+        save_newick(&tax, &mut s, None)?;
+        assert_eq!(s, b"(((((((((765909:1)61598:1)53452:1)1046:1)135613:1,(((56812:1)62322:1)22:1)135622:1)1236:1)1224:1)2:1)131567:1)1;".to_vec());
 
-    let newick_str = b"(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;";
-    let tax = load_newick(&mut newick_str.as_ref()).unwrap();
-    assert_eq!(tax.parent("D").unwrap(), Some(("E", 0.4)));
-    assert_eq!(tax.parent("E").unwrap(), Some(("F", 0.5)));
+        // try saving a subtree
+        let mut s: Vec<u8> = Vec::new();
+        save_newick(&tax, &mut s, Some(53452))?;
+        assert_eq!(s, b"((765909:1)61598:1)53452:1;");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_newick() -> Result<()> {
+        let newick_str = b"(())";
+        let tax = load_newick(&mut newick_str.as_ref())?;
+        assert_eq!(Taxonomy::<&str, _>::len(&tax), 3);
+
+        let newick_str = b"(A,B,(C,D));";
+        let tax = load_newick(&mut newick_str.as_ref())?;
+        assert_eq!(Taxonomy::<&str, _>::len(&tax), 6);
+
+        let newick_str = b"(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;";
+        let tax = load_newick(&mut newick_str.as_ref())?;
+        assert_eq!(tax.parent("D")?, Some(("E", 0.4)));
+        assert_eq!(tax.parent("E")?, Some(("F", 0.5)));
+        Ok(())
+    }
 }
