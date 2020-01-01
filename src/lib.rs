@@ -32,13 +32,13 @@ pub enum TaxonomyError {
 }
 
 mod base;
-pub mod distances;
 pub mod edit;
 pub mod formats;
 #[cfg(any(feature = "python", feature = "python_test"))]
 pub mod python;
 mod rank;
 mod taxonomy;
+pub mod weights;
 
 pub use crate::base::GeneralTaxonomy;
 pub use crate::rank::TaxRank;

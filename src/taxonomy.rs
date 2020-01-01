@@ -1,5 +1,5 @@
-//! The Taxonomy trait defines a large suite of methods that can be used
-//! by implementing a limited subset of required methods.
+//! The Taxonomy trait defines a large suite of methods that can be used by
+//! implementing a limited subset of required methods.
 use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::iter::Sum;
@@ -41,8 +41,9 @@ where
     /// have access to ranks in a standardized fashion.
     fn rank(&self, tax_id: T) -> Result<Option<TaxRank>>;
 
-    /// Returns a [Vec] of taxonomy nodes from the one provided
-    /// back to root.
+    /// Returns a [Vec] of taxonomy nodes from the one provided back to root.
+    /// This method must return the node itself as the first entry in the list
+    /// and the root node as the last entry in the list.
     fn lineage(&'t self, tax_id: T) -> Result<Vec<T>> {
         // make a vec of parents of id1
         let mut parents = Vec::new();
@@ -135,9 +136,8 @@ where
         self.traverse(self.root()).unwrap().count() / 2
     }
 
-    /// Convenience function for determining if there are any nodes at all
-    /// in the taxonomy. This should almost always be implemented for performance
-    /// reasons.
+    /// Determines if there are any nodes at all in the taxonomy. This should
+    /// almost always be implemented for performance reasons.
     fn is_empty(&'t self) -> bool
     where
         Self: Sized,
