@@ -74,7 +74,7 @@ class Taxonomy(object):
         out = {}
         out['node_link_data'] = json_graph.node_link_data(self.tax_graph)
         out['metadata'] = self.metadata
-        if isinstance(f, (file, gzip.GzipFile)):
+        if hasattr(f, 'write'):
             json.dump(out, f)
         else:
             if gzip:
