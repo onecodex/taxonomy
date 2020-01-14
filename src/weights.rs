@@ -22,7 +22,6 @@ where
     T: Clone + Debug + Display + Hash + PartialEq + Ord,
     W: Clone + Debug + Ord + PartialOrd + PartialEq + Sum,
 {
-    // TODO: should only return leaf nodes
     let mut taxs_by_score: BinaryHeap<(W, T)> = BinaryHeap::new();
     let mut stem_ids: HashSet<T> = HashSet::new();
     for tax_id in weights.keys() {
@@ -66,15 +65,21 @@ where
 /// itself, but only uses the weights provided. This can greatly speed up the
 /// calculation because it reduces the number of possible paths that need to
 /// be checked.
+///
+/// If `take_first_in_tie` is set the tax_id returned will be the most
+/// specific possible (e.g. a strain), but may not be completely correct if
+/// there are multiple specific paths (e.g. multiple strains with the same
+/// path weight). Setting to false will return the common ancestor of those
+/// strains.
 pub fn maximum_weighted_path<'t, D: 't, T: 't, W: 't, S: BuildHasher>(
     taxonomy: &'t impl Taxonomy<'t, T, D>,
     weights: &HashMap<T, W, S>,
     take_first_in_tie: bool,
-) -> Result<(Option<T>, W)>
+) -> Result<Option<(T, W)>>
 where
     D: Debug + PartialOrd + Sum,
     T: Clone + Debug + Display + Hash + PartialEq + Ord,
-    W: Clone + Debug + Ord + PartialOrd + PartialEq + Sum,
+    W: Clone + Debug + PartialOrd + PartialEq + Sum,
 {
     let mut max_taxes: Vec<T> = Vec::new();
     // this is gross, but there's no "Zero" trait we can define to init this
@@ -104,7 +109,7 @@ where
     }
 
     if take_first_in_tie {
-        return Ok((max_taxes.into_iter().next(), max_score));
+        return Ok(max_taxes.into_iter().next().map(|a| (a, max_score)));
     }
 
     let first_child = max_taxes.pop();
@@ -115,7 +120,8 @@ where
                 None => Ok(None),
                 Some(a) => taxonomy.lca(a, child).map(Some),
             })?;
-    Ok((ancestor, max_score))
+
+    Ok(ancestor.map(|a| (a, max_score)))
     // is max_score going to be a little low here because we're not counting
     // all the leaf nodes?
 }
@@ -135,7 +141,7 @@ pub fn rollup_weights<'t, D: 't, T: 't, W: 't, S: BuildHasher>(
 where
     D: Debug + PartialOrd + Sum,
     T: Clone + Debug + Display + Hash + PartialEq + Ord,
-    W: Clone + Debug + Ord + PartialOrd + PartialEq + Sum,
+    W: Clone + Debug + PartialOrd + PartialEq + Sum,
 {
     let mut all_weights: HashMap<T, Vec<W>> = HashMap::new();
     for (leaf_id, weight) in weights {
@@ -185,9 +191,18 @@ fn test_maximum_weighted_path() -> Result<()> {
     hits.insert(22, 270);
     hits.insert(62322, 49);
     hits.insert(56812, 1);
-    let (node, weight) = maximum_weighted_path(&tax, &hits, false)?;
-    assert_eq!(node, Some(56812));
+    let (node, weight) = maximum_weighted_path(&tax, &hits, false)?.unwrap();
+    assert_eq!(node, 56812);
     assert_eq!(weight, 25 + 233 + 512 + 33 + 275 + 59 + 270 + 49 + 1);
+
+    let mut eq_hits: HashMap<u32, u16> = HashMap::new();
+    eq_hits.insert(2, 100);
+    eq_hits.insert(56812, 10);
+    eq_hits.insert(765909, 10);
+    let (node, weight) = maximum_weighted_path(&tax, &eq_hits, true)?.unwrap();
+    assert!(node == 56812 || node == 765909);
+    assert_eq!(weight, 110);
+
     Ok(())
 }
 

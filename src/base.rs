@@ -33,26 +33,20 @@ impl GeneralTaxonomy {
     /// calls this), but it's possible that a user might want to save
     /// memory/start-up time so it's theoretically possible to use this
     /// struct without running this.
-    fn index(mut self, tax_id: bool, children: bool) -> Self {
-        if tax_id && self.tax_id_lookup == None {
-            let mut tax_id_lookup = HashMap::with_capacity(self.tax_ids.len());
-            for (ix, tax_id) in self.tax_ids.iter().enumerate() {
-                tax_id_lookup.insert(tax_id.clone(), ix);
-            }
-
-            self.tax_id_lookup = Some(tax_id_lookup);
+    fn index(&mut self) {
+        let mut tax_id_lookup = HashMap::with_capacity(self.tax_ids.len());
+        for (ix, tax_id) in self.tax_ids.iter().enumerate() {
+            tax_id_lookup.insert(tax_id.clone(), ix);
         }
-        if children && self.children_lookup == None {
-            let mut children_lookup = vec![Vec::new(); self.tax_ids.len()];
-            for (ix, parent_ix) in self.parent_ids.iter().enumerate() {
-                if ix != 0 {
-                    children_lookup[*parent_ix].push(ix);
-                }
-            }
+        self.tax_id_lookup = Some(tax_id_lookup);
 
-            self.children_lookup = Some(children_lookup);
+        let mut children_lookup = vec![Vec::new(); self.tax_ids.len()];
+        for (ix, parent_ix) in self.parent_ids.iter().enumerate() {
+            if ix != 0 {
+                children_lookup[*parent_ix].push(ix);
+            }
         }
-        self
+        self.children_lookup = Some(children_lookup);
     }
 
     /// Initializer for a new Taxonomy.
@@ -64,32 +58,36 @@ impl GeneralTaxonomy {
         names: Option<Vec<String>>,
         ranks: Option<Vec<Option<TaxRank>>>,
         dists: Option<Vec<f32>>,
-    ) -> Self {
+    ) -> Result<Self> {
         let adj_names = names.unwrap_or_else(|| vec!["".to_string(); tax_ids.len()]);
         let adj_ranks = ranks.unwrap_or_else(|| vec![None; tax_ids.len()]);
         let adj_dists = dists.unwrap_or_else(|| vec![1.; tax_ids.len()]);
-        assert_eq!(
-            tax_ids.len(),
-            parent_ids.len(),
-            "each taxa must have only one parent"
-        );
-        assert_eq!(
-            tax_ids.len(),
-            adj_names.len(),
-            "each taxa must have only one name"
-        );
-        assert_eq!(
-            tax_ids.len(),
-            adj_ranks.len(),
-            "each taxa must have only one rank"
-        );
-        assert_eq!(
-            tax_ids.len(),
-            adj_dists.len(),
-            "each taxa must have only one parent distance"
-        );
+        if tax_ids.len() != parent_ids.len() {
+            return Err(TaxonomyError::CreationFailed {
+                field: "parent".to_string(),
+            }
+            .into());
+        }
+        if tax_ids.len() != adj_names.len() {
+            return Err(TaxonomyError::CreationFailed {
+                field: "name".to_string(),
+            }
+            .into());
+        }
+        if tax_ids.len() != adj_ranks.len() {
+            return Err(TaxonomyError::CreationFailed {
+                field: "rank".to_string(),
+            }
+            .into());
+        }
+        if tax_ids.len() != adj_dists.len() {
+            return Err(TaxonomyError::CreationFailed {
+                field: "parent distance".to_string(),
+            }
+            .into());
+        }
 
-        GeneralTaxonomy {
+        let mut tax = GeneralTaxonomy {
             tax_ids,
             parent_ids,
             parent_dists: adj_dists,
@@ -97,10 +95,12 @@ impl GeneralTaxonomy {
             names: adj_names,
             tax_id_lookup: None,
             children_lookup: None,
-        }
-        .index(true, true)
+        };
+        tax.index();
+        Ok(tax)
     }
 
+    /// Build a GeneralTaxonomy from any object that implements the Taxonomy trait.
     pub fn from_taxonomy<'t, T: 't, D: 't>(taxonomy: &'t impl Taxonomy<'t, T, D>) -> Result<Self>
     where
         T: Clone + Debug + Display + PartialEq + Ord,
@@ -137,7 +137,7 @@ impl GeneralTaxonomy {
             stack.push(ix);
             ix += 1;
         }
-        Ok(GeneralTaxonomy {
+        let mut tax = GeneralTaxonomy {
             tax_ids,
             parent_ids,
             parent_dists,
@@ -145,8 +145,9 @@ impl GeneralTaxonomy {
             names,
             tax_id_lookup: None,
             children_lookup: None,
-        }
-        .index(true, true))
+        };
+        tax.index();
+        Ok(tax)
     }
 
     /// Given an internal tax_id (an array position) return the
@@ -209,35 +210,12 @@ impl GeneralTaxonomy {
         // reattach all the child nodes to the parent of the deleted node
         let node_parent = self.parent_ids[tax_id as usize];
         let parent_dist = self.parent_dists[tax_id as usize];
-        let mut children = Vec::new();
-        for (ix, (parent, dist)) in self
-            .parent_ids
-            .iter_mut()
-            .zip(self.parent_dists.iter_mut())
-            .enumerate()
-        {
+        for (parent, dist) in self.parent_ids.iter_mut().zip(self.parent_dists.iter_mut()) {
             if *parent == tax_id {
                 *parent = node_parent;
                 *dist += parent_dist;
-                children.push(ix);
             }
         }
-
-        // update the cached lookup tables
-        if let Some(ref mut tax_id_lookup) = self.tax_id_lookup {
-            // note: we do this before changing the table itself just so we
-            // can do this lookup here
-            tax_id_lookup.remove(&self.tax_ids[tax_id as usize]);
-            for value in tax_id_lookup.values_mut() {
-                if *value > tax_id {
-                    *value -= 1;
-                }
-            }
-        };
-        if let Some(ref mut children_lookup) = self.children_lookup {
-            children_lookup[node_parent].extend(children);
-            children_lookup.remove(tax_id);
-        };
 
         // and delete the node from all the other tables
         // (note we do this last so we still have the tax id above)
@@ -253,6 +231,10 @@ impl GeneralTaxonomy {
             *parent -= 1;
         }
 
+        // we could try to update the lookups, but all of the values in
+        // tax_id_lookup need to be scanned and all of the keys and values
+        // in children_lookup have changed so it's easier to just rebuild
+        self.index();
         Ok(())
     }
 
@@ -413,6 +395,56 @@ pub(crate) mod test {
 
     pub(crate) fn create_example() -> GeneralTaxonomy {
         GeneralTaxonomy::from_taxonomy(&MockTax).unwrap()
+    }
+
+    #[test]
+    fn test_new() -> Result<()> {
+        assert!(GeneralTaxonomy::new(
+            vec!["1".to_string(), "2".to_string()],
+            vec![0, 0],
+            Some(vec!["A".to_string(), "B".to_string()]),
+            Some(vec![None, None]),
+            Some(vec![1., 1.]),
+        )
+        .is_ok());
+
+        assert!(GeneralTaxonomy::new(
+            vec!["1".to_string(), "2".to_string()],
+            vec![0],
+            None,
+            None,
+            None,
+        )
+        .is_err());
+
+        assert!(GeneralTaxonomy::new(
+            vec!["1".to_string(), "2".to_string()],
+            vec![0, 0],
+            Some(vec!["A".to_string()]),
+            None,
+            None,
+        )
+        .is_err());
+
+        assert!(GeneralTaxonomy::new(
+            vec!["1".to_string(), "2".to_string()],
+            vec![0, 0],
+            None,
+            Some(vec![None]),
+            None,
+        )
+        .is_err());
+
+        assert!(GeneralTaxonomy::new(
+            vec!["1".to_string(), "2".to_string()],
+            vec![0, 0],
+            None,
+            None,
+            Some(vec![1.]),
+        )
+        .is_err());
+
+        Ok(())
     }
 
     #[test]

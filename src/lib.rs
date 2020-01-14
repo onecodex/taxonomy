@@ -29,6 +29,8 @@ pub enum TaxonomyError {
     /// the assumption its a tree
     #[fail(display = "Taxonomy is not a tree; broken at {}", tax_id)]
     MalformedTree { tax_id: String },
+    #[fail(display = "Each taxa must have only one {}", field)]
+    CreationFailed { field: String },
 }
 
 mod base;
