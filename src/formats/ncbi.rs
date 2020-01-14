@@ -111,13 +111,7 @@ where
         }
     }
 
-    Ok(GeneralTaxonomy::new(
-        tax_ids,
-        parent_ids,
-        Some(names),
-        Some(ranks),
-        None,
-    ))
+    GeneralTaxonomy::new(tax_ids, parent_ids, Some(names), Some(ranks), None)
 }
 
 // TODO: add root_node

@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
-use std::fs::File;
 use std::hash::Hash;
 use std::io::{Read, Write};
 use std::iter::Sum;
-use std::path::Path;
 use std::str::FromStr;
 
 use failure::{bail, format_err};
@@ -15,19 +13,9 @@ use crate::rank::TaxRank;
 use crate::taxonomy::Taxonomy;
 use crate::Result;
 
-// TODO: move to the CLI or Python API?
-pub fn load_json_file<P>(build_json_path: P, key: Option<&str>) -> Result<GeneralTaxonomy>
-where
-    P: AsRef<Path>,
-{
-    let build_file =
-        File::open(build_json_path).map_err(|_| format_err!("build.json not found"))?;
-    load_json(build_file, key)
-}
-
-fn extract_json_node<'k, 'n>(node: &'n Value, key: &'k str) -> Result<&'n Value> {
+fn extract_json_node<'k, 'n>(node: &'n Value, key: &'k [&'k str]) -> Result<&'n Value> {
     let mut mnode = node;
-    for subkey in key.split('.') {
+    for subkey in key.iter() {
         if let Some(n) = mnode.get(subkey) {
             mnode = n;
         } else {
@@ -39,7 +27,7 @@ fn extract_json_node<'k, 'n>(node: &'n Value, key: &'k str) -> Result<&'n Value>
 
 /// Load a Taxonomy out of the `reader` automatically trying to determine
 /// what subtype of the JSON types we understand it is.
-pub fn load_json<R>(reader: R, key: Option<&str>) -> Result<GeneralTaxonomy>
+pub fn load_json<R>(reader: R, key: Option<&[&str]>) -> Result<GeneralTaxonomy>
 where
     R: Read,
 {
@@ -108,13 +96,7 @@ pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         ranks.push(rank);
     }
 
-    Ok(GeneralTaxonomy::new(
-        tax_ids,
-        parent_ids,
-        Some(names),
-        Some(ranks),
-        None,
-    ))
+    GeneralTaxonomy::new(tax_ids, parent_ids, Some(names), Some(ranks), None)
 }
 
 pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
@@ -177,13 +159,7 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         &mut ranks,
     )?;
 
-    Ok(GeneralTaxonomy::new(
-        tax_ids,
-        parent_ids,
-        Some(names),
-        Some(ranks),
-        None,
-    ))
+    GeneralTaxonomy::new(tax_ids, parent_ids, Some(names), Some(ranks), None)
 }
 
 pub fn save_json<'t, T: 't, D: 't, X, W>(
@@ -352,7 +328,7 @@ mod test {
     #[test]
     fn test_key_retrieval() -> Result<()> {
         let example = r#"{"test": {"sub": {"nodes": [], "links": []}}}"#;
-        let tax: GeneralTaxonomy = load_json(Cursor::new(example), Some("test.sub"))?;
+        let tax: GeneralTaxonomy = load_json(Cursor::new(example), Some(&["test", "sub"]))?;
         assert_eq!(Taxonomy::<usize, _>::len(&tax), 0);
         Ok(())
     }

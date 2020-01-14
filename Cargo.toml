@@ -11,13 +11,13 @@ readme = "./README.md"
 edition = "2018"
 
 [dependencies]
-failure = "0.1.5"
+failure = "0.1.6"
 memchr = "2.2.1"
-pyo3 = { version = "0.8.4", optional = true }
-quick-xml = "0.15.0"
-serde = "1.0.99"
-serde_derive = "1.0.99"
-serde_json = "1.0.40"
+pyo3 = { version = "0.8.5", optional = true }
+quick-xml = "0.17.2"
+serde = "1.0.104"
+serde_derive = "1.0.104"
+serde_json = "1.0.44"
 
 [features]
 python = ["pyo3/extension-module"]
@@ -28,8 +28,8 @@ crate-type=["cdylib", "rlib"]
 bench = false
 
 [dev-dependencies]
-criterion = "^0.2"
-rand = "^0.5"
+criterion = "^0.3"
+rand = "^0.7"
 
 [[bench]]
 name = "taxonomy"

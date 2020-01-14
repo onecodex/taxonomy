@@ -164,13 +164,7 @@ where
     // or should we should have a fallback that makes up an ID for this (and
     // for Newick trees) for anything that doesn't have any kind of identifier?
 
-    Ok(GeneralTaxonomy::new(
-        tax_ids,
-        parent_ids,
-        cleaned_names,
-        Some(ranks),
-        Some(dists),
-    ))
+    GeneralTaxonomy::new(tax_ids, parent_ids, cleaned_names, Some(ranks), Some(dists))
 }
 
 #[cfg(test)]
