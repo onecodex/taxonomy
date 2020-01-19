@@ -53,7 +53,7 @@ pip install taxonomy
 # Development
 
 ## Rust
-There is a test suite runable with `cargo test`.
+There is a test suite runable with `cargo test`. To test the Python-bindings you need to use the additional `python_test` feature: `cargo test --features python_test`.
 
 ## Python
 To work on the Python library on a Mac OS X/Unix system (requires Python 3):
