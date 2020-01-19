@@ -84,19 +84,18 @@ pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
             .to_string();
         names.push(name);
         let rank = if n["rank"].is_null() {
-            None
+            TaxRank::Unspecified
         } else {
             TaxRank::from_str(
                 n["rank"]
                     .as_str()
                     .ok_or_else(|| format_err!("Ranks must be strings"))?,
-            )
-            .ok()
+            )?
         };
         ranks.push(rank);
     }
 
-    GeneralTaxonomy::new(tax_ids, parent_ids, Some(names), Some(ranks), None)
+    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None)
 }
 
 pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
@@ -106,7 +105,7 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         tax_ids: &mut Vec<String>,
         parent_ids: &mut Vec<usize>,
         names: &mut Vec<String>,
-        ranks: &mut Vec<Option<TaxRank>>,
+        ranks: &mut Vec<TaxRank>,
     ) -> Result<()> {
         let tax_id = node["id"]
             .as_str()
@@ -126,9 +125,9 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
             let str_rank = rank
                 .as_str()
                 .ok_or_else(|| format_err!("Rank for {} is not a string", tax_id))?;
-            ranks.push(TaxRank::from_str(str_rank).ok());
+            ranks.push(TaxRank::from_str(str_rank)?);
         } else {
-            ranks.push(None);
+            ranks.push(TaxRank::Unspecified);
         }
 
         let loc = tax_ids.len() - 1;
@@ -159,7 +158,7 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         &mut ranks,
     )?;
 
-    GeneralTaxonomy::new(tax_ids, parent_ids, Some(names), Some(ranks), None)
+    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None)
 }
 
 pub fn save_json<'t, T: 't, D: 't, X, W>(
@@ -204,7 +203,7 @@ where
         let rank = tax.rank(tid.clone())?;
         nodes.push(json!({
             "name": name,
-            "rank": rank.map_or("", |x| x.to_ncbi_rank()),
+            "rank": rank.to_ncbi_rank(),
             "id": tax_id,
         }));
         id_to_idx.insert(tid.clone(), ix);
@@ -247,7 +246,7 @@ where
     let tax_json = json!({
         "id": format!("{}", tax_id),
         "name": name,
-        "rank": rank.map_or("", |x| x.to_ncbi_rank()),
+        "rank": rank.to_ncbi_rank(),
         "children": children,
     });
 

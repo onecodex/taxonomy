@@ -72,7 +72,7 @@ where
     let mut tax_ids: Vec<String> = vec![];
     let mut names: Vec<Option<String>> = vec![];
     let mut parent_ids: Vec<usize> = vec![];
-    let mut ranks: Vec<Option<TaxRank>> = vec![];
+    let mut ranks: Vec<TaxRank> = vec![];
     let mut dists: Vec<f32> = vec![];
 
     let mut cur_lineage: Vec<usize> = Vec::new();
@@ -108,7 +108,7 @@ where
                                 .unwrap_or(&"1".to_string())
                                 .parse()?,
                         );
-                        ranks.push(None);
+                        ranks.push(TaxRank::Unspecified);
                     }
                     t => current_tag = t.to_vec(),
                 }
@@ -132,7 +132,7 @@ where
                     b"name" => *names.last_mut().unwrap() = Some(text),
                     b"id" => *tax_ids.last_mut().unwrap() = text,
                     b"branch_length" => *dists.last_mut().unwrap() = text.parse()?,
-                    b"rank" => *ranks.last_mut().unwrap() = TaxRank::from_str(&text).ok(),
+                    b"rank" => *ranks.last_mut().unwrap() = TaxRank::from_str(&text)?,
                     // TODO: do something with confidence scores?
                     // b"confidence" => {},
                     // TODO: build up a dict of additional metadata we can scrape out?
@@ -164,7 +164,7 @@ where
     // or should we should have a fallback that makes up an ID for this (and
     // for Newick trees) for anything that doesn't have any kind of identifier?
 
-    GeneralTaxonomy::new(tax_ids, parent_ids, cleaned_names, Some(ranks), Some(dists))
+    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, cleaned_names, Some(ranks), Some(dists))
 }
 
 #[cfg(test)]

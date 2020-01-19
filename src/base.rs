@@ -19,7 +19,7 @@ pub struct GeneralTaxonomy {
     pub tax_ids: Vec<String>,
     pub parent_ids: Vec<IntTaxID>,
     pub parent_dists: Vec<f32>,
-    pub ranks: Vec<Option<TaxRank>>,
+    pub ranks: Vec<TaxRank>,
     pub names: Vec<String>,
 
     // these are optional lookup tables to speed up some operations
@@ -52,15 +52,15 @@ impl GeneralTaxonomy {
     /// Initializer for a new Taxonomy.
     ///
     /// All `Vec`s must be the same length or initialization will fail.
-    pub fn new(
+    pub fn from_arrays(
         tax_ids: Vec<String>,
         parent_ids: Vec<usize>,
         names: Option<Vec<String>>,
-        ranks: Option<Vec<Option<TaxRank>>>,
+        ranks: Option<Vec<TaxRank>>,
         dists: Option<Vec<f32>>,
     ) -> Result<Self> {
         let adj_names = names.unwrap_or_else(|| vec!["".to_string(); tax_ids.len()]);
-        let adj_ranks = ranks.unwrap_or_else(|| vec![None; tax_ids.len()]);
+        let adj_ranks = ranks.unwrap_or_else(|| vec![TaxRank::Unspecified; tax_ids.len()]);
         let adj_dists = dists.unwrap_or_else(|| vec![1.; tax_ids.len()]);
         if tax_ids.len() != parent_ids.len() {
             return Err(TaxonomyError::CreationFailed {
@@ -244,7 +244,7 @@ impl GeneralTaxonomy {
         self.tax_ids.push(tax_id.to_string());
         self.parent_ids.push(parent_id);
         self.parent_dists.push(1.);
-        self.ranks.push(None);
+        self.ranks.push(TaxRank::Unspecified);
         self.names.push("".to_string());
 
         // update the cached lookup tables
@@ -322,7 +322,7 @@ impl<'s> Taxonomy<'s, IntTaxID, f32> for GeneralTaxonomy {
         Ok(&self.names[tax_id])
     }
 
-    fn rank(&self, tax_id: usize) -> Result<Option<TaxRank>> {
+    fn rank(&self, tax_id: usize) -> Result<TaxRank> {
         if tax_id >= self.parent_ids.len() {
             return Err(TaxonomyError::NoSuchKey {
                 key: tax_id.to_string(),
@@ -382,7 +382,7 @@ impl<'s> Taxonomy<'s, &'s str, f32> for GeneralTaxonomy {
         Ok(&self.names[tax_id])
     }
 
-    fn rank(&self, tax_id: &str) -> Result<Option<TaxRank>> {
+    fn rank(&self, tax_id: &str) -> Result<TaxRank> {
         let tax_id = self.to_internal_id(&tax_id)?;
         Ok(self.ranks[tax_id])
     }
@@ -399,16 +399,16 @@ pub(crate) mod test {
 
     #[test]
     fn test_new() -> Result<()> {
-        assert!(GeneralTaxonomy::new(
+        assert!(GeneralTaxonomy::from_arrays(
             vec!["1".to_string(), "2".to_string()],
             vec![0, 0],
             Some(vec!["A".to_string(), "B".to_string()]),
-            Some(vec![None, None]),
+            Some(vec![TaxRank::Unspecified, TaxRank::Unspecified]),
             Some(vec![1., 1.]),
         )
         .is_ok());
 
-        assert!(GeneralTaxonomy::new(
+        assert!(GeneralTaxonomy::from_arrays(
             vec!["1".to_string(), "2".to_string()],
             vec![0],
             None,
@@ -417,7 +417,7 @@ pub(crate) mod test {
         )
         .is_err());
 
-        assert!(GeneralTaxonomy::new(
+        assert!(GeneralTaxonomy::from_arrays(
             vec!["1".to_string(), "2".to_string()],
             vec![0, 0],
             Some(vec!["A".to_string()]),
@@ -426,16 +426,16 @@ pub(crate) mod test {
         )
         .is_err());
 
-        assert!(GeneralTaxonomy::new(
+        assert!(GeneralTaxonomy::from_arrays(
             vec!["1".to_string(), "2".to_string()],
             vec![0, 0],
             None,
-            Some(vec![None]),
+            Some(vec![TaxRank::Unspecified]),
             None,
         )
         .is_err());
 
-        assert!(GeneralTaxonomy::new(
+        assert!(GeneralTaxonomy::from_arrays(
             vec!["1".to_string(), "2".to_string()],
             vec![0, 0],
             None,
