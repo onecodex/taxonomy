@@ -10,21 +10,21 @@ use crate::rank::TaxRank;
 use crate::taxonomy::Taxonomy;
 use crate::{Result, TaxonomyError};
 
-pub type IntTaxID = usize;
+pub type IntTaxId = usize;
 
 /// A concrete implementation of the Taxonomy trait suitable for interconversions
 /// of different formats.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GeneralTaxonomy {
     pub tax_ids: Vec<String>,
-    pub parent_ids: Vec<IntTaxID>,
+    pub parent_ids: Vec<IntTaxId>,
     pub parent_dists: Vec<f32>,
     pub ranks: Vec<TaxRank>,
     pub names: Vec<String>,
 
     // these are optional lookup tables to speed up some operations
-    pub(crate) tax_id_lookup: Option<HashMap<String, IntTaxID>>,
-    pub(crate) children_lookup: Option<Vec<Vec<IntTaxID>>>,
+    pub(crate) tax_id_lookup: Option<HashMap<String, IntTaxId>>,
+    pub(crate) children_lookup: Option<Vec<Vec<IntTaxId>>>,
 }
 
 impl GeneralTaxonomy {
@@ -49,7 +49,7 @@ impl GeneralTaxonomy {
         self.children_lookup = Some(children_lookup);
     }
 
-    /// Initializer for a new Taxonomy.
+    /// Initializer for a new GeneralTaxonomy.
     ///
     /// All `Vec`s must be the same length or initialization will fail.
     pub fn from_arrays(
@@ -157,7 +157,7 @@ impl GeneralTaxonomy {
     /// the can be used to speed up some operations by avoiding a string lookup.
     #[allow(clippy::wrong_self_convention)]
     #[inline]
-    pub fn from_internal_id(&self, tax_id: IntTaxID) -> Result<&str> {
+    pub fn from_internal_id(&self, tax_id: IntTaxId) -> Result<&str> {
         // TODO: index so we'll get an Err
         Ok(&self.tax_ids[tax_id as usize])
     }
@@ -169,7 +169,7 @@ impl GeneralTaxonomy {
     /// Because the `Taxonomy` train is implemented for internal IDs also,
     /// the can be used to speed up some operations by avoiding a string lookup.
     #[inline]
-    pub fn to_internal_id(&self, tax_id: &str) -> Result<IntTaxID> {
+    pub fn to_internal_id(&self, tax_id: &str) -> Result<IntTaxId> {
         match self.tax_id_lookup {
             Some(ref lookup) => lookup.get(tax_id).map_or_else(
                 || {
@@ -183,7 +183,7 @@ impl GeneralTaxonomy {
             None => {
                 for (ix, k) in self.tax_ids.iter().enumerate() {
                     if k == tax_id {
-                        return Ok(ix as IntTaxID);
+                        return Ok(ix as IntTaxId);
                     }
                 }
                 Err(TaxonomyError::NoSuchKey {
@@ -198,7 +198,7 @@ impl GeneralTaxonomy {
     ///
     /// Unlike pruning the children of the node are kept, but are rejoined
     /// onto the node's parent. The root node can not be removed
-    pub fn remove(&mut self, tax_id: IntTaxID) -> Result<()> {
+    pub fn remove(&mut self, tax_id: IntTaxId) -> Result<()> {
         // don't allow deleting root because that messes up the tree structure
         if tax_id == 0 {
             return Err(TaxonomyError::MalformedTree {
@@ -239,7 +239,7 @@ impl GeneralTaxonomy {
     }
 
     /// Add a new node to the taxonomy.
-    pub fn add(&mut self, parent_id: IntTaxID, tax_id: &str) -> Result<()> {
+    pub fn add(&mut self, parent_id: IntTaxId, tax_id: &str) -> Result<()> {
         let new_int_id = self.tax_ids.len();
         self.tax_ids.push(tax_id.to_string());
         self.parent_ids.push(parent_id);
@@ -259,16 +259,33 @@ impl GeneralTaxonomy {
     }
 }
 
+impl Default for GeneralTaxonomy {
+    /// Create a new GeneralTaxonomy with only a root node.
+    fn default() -> Self {
+        let mut tax = GeneralTaxonomy {
+            tax_ids: vec!["1".to_string()],
+            parent_ids: vec![0],
+            parent_dists: vec![1.],
+            ranks: vec![TaxRank::Unspecified],
+            names: vec!["root".to_string()],
+            tax_id_lookup: None,
+            children_lookup: None,
+        };
+        tax.index();
+        tax
+    }
+}
+
 /// This is the implementation for "internal" tax ID lookup; these IDs are
 /// arbitrary (they're positions of the tax nodes in the internal array) and
 /// not linked at all to the "external" (e.g. NCBI) IDs. Using these IDs
 /// directly can lead to a decent speed up without having to build indicies.
-impl<'s> Taxonomy<'s, IntTaxID, f32> for GeneralTaxonomy {
-    fn root(&self) -> IntTaxID {
+impl<'s> Taxonomy<'s, IntTaxId, f32> for GeneralTaxonomy {
+    fn root(&self) -> IntTaxId {
         0
     }
 
-    fn children(&self, tax_id: IntTaxID) -> Result<Vec<IntTaxID>> {
+    fn children(&self, tax_id: IntTaxId) -> Result<Vec<IntTaxId>> {
         if let Some(ref child_lookup) = self.children_lookup {
             // O(1) implementation
             if tax_id as usize >= self.parent_ids.len() {
@@ -285,14 +302,14 @@ impl<'s> Taxonomy<'s, IntTaxID, f32> for GeneralTaxonomy {
             let mut children = Vec::new();
             for (i, t) in self.parent_ids.iter().enumerate() {
                 if t == &usize_tax_id {
-                    children.push(i as IntTaxID)
+                    children.push(i as IntTaxId)
                 }
             }
             Ok(children)
         }
     }
 
-    fn parent(&self, tax_id: IntTaxID) -> Result<Option<(IntTaxID, f32)>> {
+    fn parent(&self, tax_id: IntTaxId) -> Result<Option<(IntTaxId, f32)>> {
         // O(1) implementation
         if tax_id as usize >= self.parent_ids.len() {
             return Err(TaxonomyError::NoSuchKey {
@@ -303,7 +320,7 @@ impl<'s> Taxonomy<'s, IntTaxID, f32> for GeneralTaxonomy {
             return Ok(None);
         }
         Ok(Some((
-            self.parent_ids[tax_id as usize] as IntTaxID,
+            self.parent_ids[tax_id as usize] as IntTaxId,
             self.parent_dists[tax_id as usize],
         )))
     }
@@ -354,7 +371,7 @@ impl<'s> Taxonomy<'s, &'s str, f32> for GeneralTaxonomy {
             let usize_tax_id = self.to_internal_id(&tax_id)?;
             for (i, t) in self.parent_ids.iter().enumerate() {
                 if t == &usize_tax_id {
-                    children.push(self.from_internal_id(i as IntTaxID)?)
+                    children.push(self.from_internal_id(i as IntTaxId)?)
                 }
             }
             Ok(children)
@@ -461,7 +478,7 @@ pub(crate) mod test {
         assert_eq!(tax.from_internal_id(int_id)?, "1224");
         assert!(tax.to_internal_id("not_an_id").is_err());
 
-        assert_eq!(Taxonomy::<IntTaxID, _>::root(&tax), 0);
+        assert_eq!(Taxonomy::<IntTaxId, _>::root(&tax), 0);
         assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
         Ok(())
     }

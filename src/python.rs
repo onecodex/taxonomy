@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 use pyo3::types::{IntoPyDict, PyBytes, PyDict, PyType};
 use pyo3::{create_exception, wrap_pyfunction, wrap_pymodule};
 
-use crate::base::{GeneralTaxonomy, IntTaxID};
+use crate::base::{GeneralTaxonomy, IntTaxId};
 use crate::edit::{prune_away, prune_to};
 use crate::formats::json::{load_json, save_json};
 use crate::formats::ncbi::load_ncbi;
@@ -32,8 +32,6 @@ create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::Exception);
 #[pyclass]
 pub struct Taxonomy {
     t: GeneralTaxonomy,
-    visited_nodes: Vec<IntTaxID>,
-    nodes_left: Vec<IntTaxID>,
 }
 
 #[pymethods]
@@ -50,11 +48,7 @@ impl Taxonomy {
         let mut c = Cursor::new(value);
         let t = load_json(&mut c, path.as_deref())
             .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
-        Ok(Taxonomy {
-            t,
-            nodes_left: Vec::new(),
-            visited_nodes: Vec::new(),
-        })
+        Ok(Taxonomy { t })
     }
 
     /// from_newick(cls, value: str)
@@ -66,11 +60,7 @@ impl Taxonomy {
         let mut c = Cursor::new(value);
         let t =
             load_newick(&mut c).map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
-        Ok(Taxonomy {
-            t,
-            nodes_left: Vec::new(),
-            visited_nodes: Vec::new(),
-        })
+        Ok(Taxonomy { t })
     }
 
     /// from_ncbi(cls, nodes_path: str, names_path: str)
@@ -85,11 +75,7 @@ impl Taxonomy {
         let names_file = File::open(names_path)?;
         let t = load_ncbi(nodes_file, names_file)
             .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
-        Ok(Taxonomy {
-            t,
-            nodes_left: Vec::new(),
-            visited_nodes: Vec::new(),
-        })
+        Ok(Taxonomy { t })
     }
 
     /// from_phyloxml(cls, value: str)
@@ -103,11 +89,7 @@ impl Taxonomy {
         let mut c = Cursor::new(value);
         let t =
             load_phyloxml(&mut c).map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
-        Ok(Taxonomy {
-            t,
-            nodes_left: Vec::new(),
-            visited_nodes: Vec::new(),
-        })
+        Ok(Taxonomy { t })
     }
 
     /// to_json(self, /, as_node_link: bool)
@@ -270,11 +252,7 @@ impl Taxonomy {
         if let Some(r) = remove {
             t = prune_away(&t, &r).map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
         }
-        Ok(Taxonomy {
-            t,
-            nodes_left: Vec::new(),
-            visited_nodes: Vec::new(),
-        })
+        Ok(Taxonomy { t })
     }
 
     /// remove(self, tax_id: str)
@@ -331,13 +309,27 @@ impl Taxonomy {
             self.t.names[int_id] = n.to_string();
         }
         if let Some(p) = parent_id {
+            if int_id == TaxTrait::<IntTaxId, _>::root(&self.t) {
+                return Err(PyErr::new::<TaxonomyError, _>("Root has no parent"));
+            }
             let parent = self
                 .t
                 .to_internal_id(p)
-                .map_err(|_| PyErr::new::<KeyError, _>("Parent ID is not in taxonomy"))?;
+                .map_err(|_| PyErr::new::<KeyError, _>("New parent ID is not in taxonomy"))?;
+            if TaxTrait::<IntTaxId, _>::lineage(&self.t, parent)
+                .map_err(|_| PyErr::new::<TaxonomyError, _>("New parent has bad lineage?"))?
+                .contains(&int_id)
+            {
+                return Err(PyErr::new::<TaxonomyError, _>(
+                    "Node can not be moved to its child",
+                ));
+            }
             self.t.parent_ids[int_id] = parent;
         }
         if let Some(p) = parent_dist {
+            if int_id == TaxTrait::<IntTaxId, _>::root(&self.t) {
+                return Err(PyErr::new::<TaxonomyError, _>("Root has no parent"));
+            }
             self.t.parent_dists[int_id] = p;
         }
         Ok(())
@@ -355,7 +347,7 @@ impl PyObjectProtocol for Taxonomy {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "<Taxonomy ({} nodes)>",
-            TaxTrait::<IntTaxID, _>::len(&self.t)
+            TaxTrait::<IntTaxId, _>::len(&self.t)
         ))
     }
 }
@@ -400,7 +392,7 @@ impl PyMappingProtocol for Taxonomy {
     }
 
     fn __len__(&self) -> PyResult<usize> {
-        Ok(TaxTrait::<IntTaxID, _>::len(&self.t))
+        Ok(TaxTrait::<IntTaxId, _>::len(&self.t))
     }
 }
 
@@ -413,23 +405,30 @@ impl PySequenceProtocol for Taxonomy {
 
 #[pyproto]
 impl PyIterProtocol for Taxonomy {
-    fn __iter__(slf: PyRefMut<Self>) -> PyResult<Self> {
-        Ok(Taxonomy {
-            t: slf.t.clone(),
-            nodes_left: vec![TaxTrait::<IntTaxID, _>::root(&slf.t)],
+    fn __iter__(slf: PyRefMut<Self>) -> PyResult<TaxonomyIterator> {
+        let root = TaxTrait::<IntTaxId, _>::root(&slf.t);
+        let gil_guard = Python::acquire_gil();
+        let py = gil_guard.python();
+        Ok(TaxonomyIterator {
+            t: slf.into_py(py),
+            nodes_left: vec![root],
             visited_nodes: Vec::new(),
         })
-
-        // TODO: this would save a lot of memory if we could just
-        // use the GC to make another copy
-
-        // let gil_guard = Python::acquire_gil();
-        // let py = gil_guard.python();
-        // let inst = pyo3::AsPyRef::as_ref(slf, py);
-        // Ok(inst)
     }
+}
 
+#[pyclass]
+pub struct TaxonomyIterator {
+    t: PyObject,
+    visited_nodes: Vec<IntTaxId>,
+    nodes_left: Vec<IntTaxId>,
+}
+
+#[pyproto]
+impl PyIterProtocol for TaxonomyIterator {
     fn __next__(mut slf: PyRefMut<Self>) -> PyResult<Option<String>> {
+        let gil_guard = Python::acquire_gil();
+        let py = gil_guard.python();
         let traverse_preorder = true;
         loop {
             if slf.nodes_left.is_empty() {
@@ -446,7 +445,8 @@ impl PyIterProtocol for Taxonomy {
                 slf.nodes_left.pop().unwrap() // postorder
             } else {
                 slf.visited_nodes.push(cur_node.clone());
-                let children = slf
+                let tax: &Taxonomy = slf.t.extract(py)?;
+                let children = tax
                     .t
                     .children(cur_node)
                     .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
@@ -456,8 +456,9 @@ impl PyIterProtocol for Taxonomy {
                 cur_node // preorder
             };
             if node_visited == !traverse_preorder {
+                let tax: &Taxonomy = slf.t.extract(py)?;
                 return Ok(Some(
-                    slf.t
+                    tax.t
                         .from_internal_id(node)
                         .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?
                         .to_string(),
@@ -549,8 +550,6 @@ mod test {
             py,
             Taxonomy {
                 t: create_example(),
-                visited_nodes: vec![],
-                nodes_left: vec![],
             },
         )?;
         let ctx = PyDict::new(py);
@@ -677,6 +676,9 @@ mod test {
         let py = gil.python();
         let ctx = setup_ctx(py)?;
 
+        assert!(py
+            .eval(r#"tax.change("bad id", name="New Name")"#, None, ctx)
+            .is_err());
         py.eval(r#"tax.change("135622", name="New Name")"#, None, ctx)?;
         let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(tax.t.name("135622").unwrap(), "New Name");
@@ -685,6 +687,15 @@ mod test {
         let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(tax.t.rank("135622").unwrap(), TaxRank::Genus);
 
+        assert!(py
+            .eval(r#"tax.change("2", parent_id="135622")"#, None, ctx,)
+            .is_err());
+        assert!(py
+            .eval(r#"tax.change("1", parent_id="131567")"#, None, ctx,)
+            .is_err());
+        assert!(py
+            .eval(r#"tax.change("1", parent_dist=3.5)"#, None, ctx,)
+            .is_err());
         py.eval(
             r#"tax.change("135622", parent_id="2", parent_dist=3.5)"#,
             None,
@@ -692,6 +703,7 @@ mod test {
         )?;
         let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(tax.t.parent("135622").unwrap(), Some(("2", 3.5)));
+
         Ok(())
     }
 
