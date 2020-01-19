@@ -52,7 +52,7 @@ where
             }
         }
     }
-    GeneralTaxonomy::new(new_ids, parent_ids, Some(names), Some(ranks), Some(dists))
+    GeneralTaxonomy::from_arrays(new_ids, parent_ids, Some(names), Some(ranks), Some(dists))
 }
 
 /// Return a tree containing only the given tax_ids and their parents.
@@ -106,7 +106,7 @@ where
         }
     }
 
-    GeneralTaxonomy::new(new_ids, parent_ids, Some(names), Some(ranks), Some(dists))
+    GeneralTaxonomy::from_arrays(new_ids, parent_ids, Some(names), Some(ranks), Some(dists))
 }
 
 // TODO: we should have a method that selectively removes nodes and joins

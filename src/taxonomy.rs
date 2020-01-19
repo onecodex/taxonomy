@@ -39,7 +39,7 @@ where
     /// Although not strictly required for many of the operations we implement
     /// here, this is primarily here to allow taxonomic exports to conveniently
     /// have access to ranks in a standardized fashion.
-    fn rank(&self, tax_id: T) -> Result<Option<TaxRank>>;
+    fn rank(&self, tax_id: T) -> Result<TaxRank>;
 
     /// Returns a [Vec] of taxonomy nodes from the one provided back to root.
     /// This method must return the node itself as the first entry in the list
@@ -60,10 +60,8 @@ where
     /// the immediate parent). This also returns the distance *to* that parent.
     fn parent_at_rank(&'t self, tax_id: T, rank: TaxRank) -> Result<Option<(T, D)>> {
         // if this node is at the rank, just return it
-        if let Some(cur_rank) = self.rank(tax_id.clone())? {
-            if cur_rank == rank {
-                return Ok(Some((tax_id, vec![].into_iter().sum())));
-            }
+        if self.rank(tax_id.clone())? == rank {
+            return Ok(Some((tax_id, vec![].into_iter().sum())));
         }
 
         // traverse up the tree looking for it
@@ -71,10 +69,8 @@ where
         let mut dists = Vec::new();
         while let Some(p) = self.parent(cur_id)? {
             dists.push(p.1);
-            if let Some(cur_rank) = self.rank(p.0.clone())? {
-                if cur_rank == rank {
-                    return Ok(Some((p.0, dists.into_iter().sum())));
-                }
+            if self.rank(p.0.clone())? == rank {
+                return Ok(Some((p.0, dists.into_iter().sum())));
             }
             cur_id = p.0.clone();
         }
@@ -261,16 +257,16 @@ pub(crate) mod test {
             })
         }
 
-        fn rank(&self, tax_id: u32) -> Result<Option<TaxRank>> {
+        fn rank(&self, tax_id: u32) -> Result<TaxRank> {
             Ok(match tax_id {
-                2 => Some(TaxRank::Superkingdom),
-                1224 => Some(TaxRank::Phylum),
-                1236 => Some(TaxRank::Class),
-                135613 => Some(TaxRank::Order),
-                1046 => Some(TaxRank::Family),
-                53452 => Some(TaxRank::Genus),
-                61598 => Some(TaxRank::Species),
-                _ => None,
+                2 => TaxRank::Superkingdom,
+                1224 => TaxRank::Phylum,
+                1236 => TaxRank::Class,
+                135613 => TaxRank::Order,
+                1046 => TaxRank::Family,
+                53452 => TaxRank::Genus,
+                61598 => TaxRank::Species,
+                _ => TaxRank::Unspecified,
             })
         }
     }

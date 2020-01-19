@@ -15,6 +15,8 @@ use crate::{Result, TaxonomyError};
 pub enum TaxRank {
     Domain,
     Subdomain,
+    Realm,
+    Subrealm,
     Hyperkingdom,
     Superkingdom,
     Kingdom,
@@ -86,6 +88,7 @@ pub enum TaxRank {
     Subforma,
     Cultivar,
     Breed,
+    Strain,
     Individual,
     // TODO: Unspecified prevents an auto-impl of Ord because it has no defined
     // place in the ordering (like a NaN) so we should manually derive out a
@@ -142,38 +145,44 @@ impl FromStr for TaxRank {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
+        // many of these synonyms (and the ranks themselves) were pulled from:
+        // https://en.wikipedia.org/wiki/Taxonomic_rank
         match s.trim().to_lowercase().as_ref() {
-            "domain" => Ok(TaxRank::Domain),
+            "domain" | "regio" => Ok(TaxRank::Domain),
             "subdomain" => Ok(TaxRank::Subdomain),
             "superkingdom" => Ok(TaxRank::Superkingdom),
-            "kingdom" => Ok(TaxRank::Kingdom),
-            "subkingdom" => Ok(TaxRank::Subkingdom),
+            "kingdom" | "regnum" => Ok(TaxRank::Kingdom),
+            "subkingdom" | "subregnum" => Ok(TaxRank::Subkingdom),
             "superphylum" | "superphyla" => Ok(TaxRank::Superphylum),
-            "phylum" | "phyla" => Ok(TaxRank::Phylum),
-            "subphylum" | "subphyla" => Ok(TaxRank::Subphylum),
+            "phylum" | "phyla" | "divisio" => Ok(TaxRank::Phylum),
+            "subphylum" | "subphyla" | "subdivisio" => Ok(TaxRank::Subphylum),
             "superclass" => Ok(TaxRank::Superclass),
-            "class" => Ok(TaxRank::Class),
-            "subclass" => Ok(TaxRank::Subclass),
+            "class" | "classis" => Ok(TaxRank::Class),
+            "subclass" | "subclassis" => Ok(TaxRank::Subclass),
             "infraclass" => Ok(TaxRank::Infraclass),
             "cohort" => Ok(TaxRank::Cohort),
             "superorder" => Ok(TaxRank::Superorder),
-            "order" => Ok(TaxRank::Order),
-            "suborder" => Ok(TaxRank::Suborder),
+            "order" | "ordo" => Ok(TaxRank::Order),
+            "suborder" | "subordo" => Ok(TaxRank::Suborder),
             "infraorder" => Ok(TaxRank::Infraorder),
             "parvorder" => Ok(TaxRank::Parvorder),
+            "section" | "sectio" => Ok(TaxRank::Section),
+            "subsection" => Ok(TaxRank::Subsection),
             "superfamily" => Ok(TaxRank::Superfamily),
-            "family" => Ok(TaxRank::Family),
+            "family" | "familia" => Ok(TaxRank::Family),
             "subfamily" => Ok(TaxRank::Subfamily),
-            "tribe" => Ok(TaxRank::Tribe),
+            "tribe" | "subtribus" => Ok(TaxRank::Tribe),
             "subtribe" => Ok(TaxRank::Subtribe),
-            "genus" => Ok(TaxRank::Genus),
+            "genus" | "genera" => Ok(TaxRank::Genus),
             "subgenus" => Ok(TaxRank::Subgenus),
             "species group" => Ok(TaxRank::SpeciesGroup),
             "species subgroup" => Ok(TaxRank::SpeciesSubgroup),
             "species" => Ok(TaxRank::Species),
             "subspecies" => Ok(TaxRank::Subspecies),
-            "varietas" | "variety" => Ok(TaxRank::Varietas),
-            "forma" => Ok(TaxRank::Forma),
+            "variety" | "varietas" => Ok(TaxRank::Varietas),
+            "form" | "forma" => Ok(TaxRank::Forma),
+            "subform" | "subforma" => Ok(TaxRank::Subforma),
+            "strain" => Ok(TaxRank::Strain),
             "no rank" => Ok(TaxRank::Unspecified),
             _ => Err(TaxonomyError::UnrecognizedRank {
                 rank: s.to_string(),
@@ -187,12 +196,16 @@ impl FromStr for TaxRank {
 mod test {
     use std::str::FromStr;
 
+    use crate::Result;
+
     use super::TaxRank;
     use super::TaxRank::*;
 
     static RANKS: &[super::TaxRank] = &[
         Domain,
         Subdomain,
+        Realm,
+        Subrealm,
         Hyperkingdom,
         Superkingdom,
         Kingdom,
@@ -264,6 +277,7 @@ mod test {
         Subforma,
         Cultivar,
         Breed,
+        Strain,
         Individual,
         Unspecified,
     ];
@@ -276,10 +290,11 @@ mod test {
     }
 
     #[test]
-    fn test_str_to_rank() {
+    fn test_str_to_rank() -> Result<()> {
         for rank in RANKS.iter() {
-            let _ = TaxRank::from_str(rank.to_ncbi_rank()).unwrap();
+            let _ = TaxRank::from_str(rank.to_ncbi_rank())?;
         }
         assert!(TaxRank::from_str("fake_data").is_err());
+        Ok(())
     }
 }

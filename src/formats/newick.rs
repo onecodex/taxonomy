@@ -162,7 +162,7 @@ where
         }
     }
 
-    GeneralTaxonomy::new(tax_ids, parent_ids, None, None, Some(dists))
+    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, None, None, Some(dists))
 }
 
 #[cfg(test)]

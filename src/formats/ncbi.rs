@@ -39,7 +39,7 @@ where
     let nodes_buf = BufReader::new(node_reader);
     let mut tax_ids: Vec<String> = Vec::new();
     let mut parents: Vec<String> = Vec::new();
-    let mut ranks: Vec<Option<TaxRank>> = Vec::new();
+    let mut ranks: Vec<TaxRank> = Vec::new();
     let mut tax_to_idx: HashMap<String, usize> = HashMap::new();
 
     for (ix, line) in nodes_buf.lines().enumerate() {
@@ -67,7 +67,7 @@ where
 
         tax_ids.push(tax_id.clone());
         parents.push(parent_tax_id.to_string());
-        ranks.push(TaxRank::from_str(&rank).ok());
+        ranks.push(TaxRank::from_str(&rank)?);
         tax_to_idx.insert(tax_id, ix);
     }
 
@@ -111,10 +111,10 @@ where
         }
     }
 
-    GeneralTaxonomy::new(tax_ids, parent_ids, Some(names), Some(ranks), None)
+    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None)
 }
 
-// TODO: add root_node
+// TODO: add root_node parameter
 pub fn save_ncbi_files<'t, P, T: 't, D: 't, X>(tax: &'t X, name_file: P, node_file: P) -> Result<()>
 where
     P: AsRef<Path>,
@@ -138,7 +138,7 @@ where
                 tax.parent(key.clone())?
                     .map(|x| format!("{}", x.0))
                     .unwrap_or_else(|| "".to_string()),
-                rank.map(|x| x.to_ncbi_rank()).unwrap_or(""),
+                rank.to_ncbi_rank(),
             )
             .as_bytes(),
         )?;
@@ -212,7 +212,7 @@ fn test_ncbi_importer() -> Result<()> {
 131567\t|\tcellular organisms\t|\t\t|\tscientific name\t|";
     let tax = load_ncbi(Cursor::new(nodes), Cursor::new(names))?;
     assert_eq!(tax.name("562")?, "Escherichia coli");
-    assert_eq!(tax.rank("562")?, Some(TaxRank::Species));
+    assert_eq!(tax.rank("562")?, TaxRank::Species);
     assert_eq!(tax.parent("562")?, Some(("561", 1.)));
     assert_eq!(tax.children("561")?, vec!["562"]);
 

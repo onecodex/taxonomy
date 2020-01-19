@@ -250,11 +250,9 @@ impl Taxonomy {
         let rank = self
             .t
             .rank(id)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
-        Ok(rank
-            .map(|x| x.to_ncbi_rank())
-            .unwrap_or("no rank")
-            .to_string())
+            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?
+            .to_ncbi_rank();
+        Ok(rank.to_string())
     }
 
     /// prune(self, keep: List[str], remove: List[str])
@@ -309,6 +307,42 @@ impl Taxonomy {
         Ok(())
     }
 
+    /// change(self, tax_id: str, /, name: str, rank: str, parent_id: str, parent_dist: float)
+    /// --
+    ///
+    /// Change properties on the taxonomy node.
+    fn change(
+        &mut self,
+        tax_id: &str,
+        name: Option<&str>,
+        rank: Option<&str>,
+        parent_id: Option<&str>,
+        parent_dist: Option<f32>,
+    ) -> PyResult<()> {
+        let int_id = self
+            .t
+            .to_internal_id(tax_id)
+            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))?;
+        if let Some(r) = rank {
+            self.t.ranks[int_id] = TaxRank::from_str(r)
+                .map_err(|_| PyErr::new::<TaxonomyError, _>("Rank could not be understood"))?;
+        }
+        if let Some(n) = name {
+            self.t.names[int_id] = n.to_string();
+        }
+        if let Some(p) = parent_id {
+            let parent = self
+                .t
+                .to_internal_id(p)
+                .map_err(|_| PyErr::new::<KeyError, _>("Parent ID is not in taxonomy"))?;
+            self.t.parent_ids[int_id] = parent;
+        }
+        if let Some(p) = parent_dist {
+            self.t.parent_dists[int_id] = p;
+        }
+        Ok(())
+    }
+
     #[getter]
     fn get_root(&self) -> PyResult<String> {
         let root: &str = self.t.root();
@@ -328,7 +362,7 @@ impl PyObjectProtocol for Taxonomy {
 
 #[pyproto]
 impl PyMappingProtocol for Taxonomy {
-    fn __getitem__(&self, key: &str) -> PyResult<(String, Option<String>)> {
+    fn __getitem__(&self, key: &str) -> PyResult<(String, String)> {
         // TODO: return namedtuple?
 
         // let gil = Python::acquire_gil();
@@ -346,8 +380,9 @@ impl PyMappingProtocol for Taxonomy {
         let rank = self
             .t
             .rank(int_id)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
-        Ok((name.to_string(), rank.map(|x| x.to_ncbi_rank().to_string())))
+            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?
+            .to_ncbi_rank();
+        Ok((name.to_string(), rank.to_string()))
     }
 
     // TODO: way to set name and rank
@@ -504,6 +539,7 @@ mod test {
     use pyo3::types::PyDict;
 
     use crate::base::test::create_example;
+    use crate::rank::TaxRank;
     use crate::taxonomy::Taxonomy as TaxTrait;
 
     use super::{weights, Taxonomy};
@@ -632,6 +668,30 @@ mod test {
         py.eval(r#"tax.prune(keep=["22"])"#, None, ctx)?;
         py.eval(r#"tax.prune(remove=["22"])"#, None, ctx)?;
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_change() -> PyResult<()> {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py)?;
+
+        py.eval(r#"tax.change("135622", name="New Name")"#, None, ctx)?;
+        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        assert_eq!(tax.t.name("135622").unwrap(), "New Name");
+
+        py.eval(r#"tax.change("135622", rank="genus")"#, None, ctx)?;
+        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        assert_eq!(tax.t.rank("135622").unwrap(), TaxRank::Genus);
+
+        py.eval(
+            r#"tax.change("135622", parent_id="2", parent_dist=3.5)"#,
+            None,
+            ctx,
+        )?;
+        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        assert_eq!(tax.t.parent("135622").unwrap(), Some(("2", 3.5)));
         Ok(())
     }
 
