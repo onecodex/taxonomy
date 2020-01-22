@@ -16,14 +16,13 @@ use std::io::{BufReader, Read, Write};
 use std::iter::Sum;
 use std::str::FromStr;
 
-use failure::bail;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
 use crate::base::GeneralTaxonomy;
 use crate::rank::TaxRank;
 use crate::taxonomy::Taxonomy;
-use crate::Result;
+use crate::{Result, TaxonomyError};
 
 /// Write a Taxonomy object out to a `writer` in the PhyloXML format.
 ///
@@ -63,7 +62,12 @@ where
                     break;
                 }
             }
-            Event::Eof => bail!("No valid phyloxml taxonomy found"),
+            Event::Eof => {
+                return Err(TaxonomyError::ImportError {
+                    line: 0,
+                    msg: "No valid phyloxml taxonomy found".to_string(),
+                })
+            }
             _ => continue,
         }
         buf.clear();
@@ -82,7 +86,12 @@ where
         match xml_reader.read_event(&mut buf)? {
             Event::Start(ref e) => {
                 match e.name() {
-                    b"phylogeny" => bail!("Nested phylogeny not permitted"),
+                    b"phylogeny" => {
+                        return Err(TaxonomyError::ImportError {
+                            line: 0,
+                            msg: "Nested phylogeny not permitted".to_string(),
+                        })
+                    }
                     b"clade" => {
                         let attributes: HashMap<&[u8], String> = e
                             .attributes()
@@ -106,7 +115,12 @@ where
                             attributes
                                 .get(&&b"branch_length"[..])
                                 .unwrap_or(&"1".to_string())
-                                .parse()?,
+                                .parse()
+                                .map_err(|_| TaxonomyError::ImportError {
+                                    line: 0,
+                                    msg: "Could not interpret branch length as a number"
+                                        .to_string(),
+                                })?,
                         );
                         ranks.push(TaxRank::Unspecified);
                     }
@@ -131,7 +145,13 @@ where
                 match &current_tag[..] {
                     b"name" => *names.last_mut().unwrap() = Some(text),
                     b"id" => *tax_ids.last_mut().unwrap() = text,
-                    b"branch_length" => *dists.last_mut().unwrap() = text.parse()?,
+                    b"branch_length" => {
+                        *dists.last_mut().unwrap() =
+                            text.parse().map_err(|_| TaxonomyError::ImportError {
+                                line: 0,
+                                msg: "Could not interpret branch length as a number".to_string(),
+                            })?
+                    }
                     b"rank" => *ranks.last_mut().unwrap() = TaxRank::from_str(&text)?,
                     // TODO: do something with confidence scores?
                     // b"confidence" => {},

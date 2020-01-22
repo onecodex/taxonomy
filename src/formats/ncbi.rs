@@ -47,16 +47,14 @@ where
         if fields.len() < 10 {
             // should be at least 14
             let msg = if ix == 0 {
-                "Not enough fields; perhaps names and nodes files are switched?"
+                "Not enough fields in nodes.dmp; perhaps names and nodes files are switched?"
             } else {
-                "Not enough fields; nodes file is bad?"
+                "Not enough fields in nodes.dmp; bad line?"
             };
             return Err(TaxonomyError::ImportError {
-                file: "nodes.dmp".to_string(),
                 line: ix,
                 msg: msg.to_string(),
-            }
-            .into());
+            });
         }
         let tax_id = fields.remove(0).to_string();
         let parent_tax_id = fields.remove(0);
@@ -76,14 +74,13 @@ where
         .iter()
         .enumerate()
         .map(|(ix, x)| {
-            tax_to_idx.get(&*x.as_str()).copied().ok_or_else(|| {
-                TaxonomyError::ImportError {
-                    file: "nodes.dmp".to_string(),
+            tax_to_idx
+                .get(&*x.as_str())
+                .copied()
+                .ok_or_else(|| TaxonomyError::ImportError {
                     line: ix + 1,
-                    msg: format!("Parent ID {} could not be found", x),
-                }
-                .into()
-            })
+                    msg: format!("Parent ID {} could not be found in nodes.dmp", x),
+                })
         })
         .collect();
 
@@ -96,11 +93,9 @@ where
         if fields.len() > 10 {
             // should only be 5
             return Err(TaxonomyError::ImportError {
-                file: "names.dmp".to_string(),
                 line: ix,
-                msg: "Too many fields?".to_string(),
-            }
-            .into());
+                msg: "Too many fields in names.dmp".to_string(),
+            });
         }
         let tax_id = fields.remove(0);
         let name = fields.remove(0);
@@ -218,5 +213,7 @@ fn test_ncbi_importer() -> Result<()> {
 
     // switching the files should result in an error
     assert!(load_ncbi(Cursor::new(names), Cursor::new(nodes)).is_err());
+    assert!(load_ncbi(Cursor::new(nodes), Cursor::new(nodes)).is_err());
+    assert!(load_ncbi(Cursor::new(names), Cursor::new(names)).is_err());
     Ok(())
 }
