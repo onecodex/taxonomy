@@ -5,13 +5,12 @@ use std::io::{Read, Write};
 use std::iter::Sum;
 use std::str::FromStr;
 
-use failure::{bail, format_err};
 use serde_json::{from_reader, json, to_writer, Value};
 
 use crate::base::GeneralTaxonomy;
 use crate::rank::TaxRank;
 use crate::taxonomy::Taxonomy;
-use crate::Result;
+use crate::{Result, TaxonomyError};
 
 fn extract_json_node<'k, 'n>(node: &'n Value, key: &'k [&'k str]) -> Result<&'n Value> {
     let mut mnode = node;
@@ -19,7 +18,10 @@ fn extract_json_node<'k, 'n>(node: &'n Value, key: &'k [&'k str]) -> Result<&'n 
         if let Some(n) = mnode.get(subkey) {
             mnode = n;
         } else {
-            bail!("JSON key {} does not exist", subkey);
+            return Err(TaxonomyError::ImportError {
+                line: 0,
+                msg: format!("JSON key {} does not exist", subkey),
+            });
         }
     }
     Ok(mnode)
@@ -49,18 +51,30 @@ where
 pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
     let tax_links = tax_json["links"]
         .as_array()
-        .ok_or_else(|| format_err!("'links' not in JSON"))?;
+        .ok_or_else(|| TaxonomyError::ImportError {
+            line: 0,
+            msg: "'links' not in JSON".to_string(),
+        })?;
     let tax_nodes = tax_json["nodes"]
         .as_array()
-        .ok_or_else(|| format_err!("'nodes' not in JSON"))?;
+        .ok_or_else(|| TaxonomyError::ImportError {
+            line: 0,
+            msg: "'nodes' not in JSON".to_string(),
+        })?;
     let mut parent_ids = vec![0; tax_nodes.len()];
     for l in tax_links {
         let source = l["source"]
             .as_u64()
-            .ok_or_else(|| format_err!("link source is bad"))? as usize;
+            .ok_or_else(|| TaxonomyError::ImportError {
+                line: 0,
+                msg: "link source is bad".to_string(),
+            })? as usize;
         let target = l["target"]
             .as_u64()
-            .ok_or_else(|| format_err!("link target is bad"))? as usize;
+            .ok_or_else(|| TaxonomyError::ImportError {
+                line: 0,
+                msg: "link target is bad".to_string(),
+            })? as usize;
         parent_ids[source] = target;
     }
 
@@ -72,7 +86,10 @@ pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
             || {
                 n["id"]
                     .as_str()
-                    .ok_or_else(|| format_err!("IDs must be strings or numbers"))
+                    .ok_or_else(|| TaxonomyError::ImportError {
+                        line: 0,
+                        msg: "IDs must be strings or numbers".to_string(),
+                    })
                     .map(|id| id.to_string())
             },
             |id| Ok(id.to_string()),
@@ -80,18 +97,23 @@ pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         tax_ids.push(ncbi_id);
         let name = n["name"]
             .as_str()
-            .ok_or_else(|| format_err!("Names must be strings"))?
+            .ok_or_else(|| TaxonomyError::ImportError {
+                line: 0,
+                msg: "Names must be strings".to_string(),
+            })?
             .to_string();
         names.push(name);
-        let rank = if n["rank"].is_null() {
-            TaxRank::Unspecified
-        } else {
-            TaxRank::from_str(
-                n["rank"]
-                    .as_str()
-                    .ok_or_else(|| format_err!("Ranks must be strings"))?,
-            )?
-        };
+        let rank =
+            if n["rank"].is_null() {
+                TaxRank::Unspecified
+            } else {
+                TaxRank::from_str(n["rank"].as_str().ok_or_else(|| {
+                    TaxonomyError::ImportError {
+                        line: 0,
+                        msg: "Ranks must be strings".to_string(),
+                    }
+                })?)?
+            };
         ranks.push(rank);
     }
 
@@ -109,22 +131,29 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
     ) -> Result<()> {
         let tax_id = node["id"]
             .as_str()
-            .ok_or_else(|| format_err!("All entries need IDs"))?;
+            .ok_or_else(|| TaxonomyError::ImportError {
+                line: 0,
+                msg: "All entries need IDs".to_string(),
+            })?;
         tax_ids.push(tax_id.to_string());
         parent_ids.push(parent_loc);
         if let Some(name) = node.get("name") {
             names.push(
                 name.as_str()
-                    .ok_or_else(|| format_err!("Name for {} not a string", tax_id))?
+                    .ok_or_else(|| TaxonomyError::ImportError {
+                        line: 0,
+                        msg: format!("Name for {} not a string", tax_id),
+                    })?
                     .to_string(),
             );
         } else {
             names.push("".to_string());
         }
         if let Some(rank) = node.get("rank") {
-            let str_rank = rank
-                .as_str()
-                .ok_or_else(|| format_err!("Rank for {} is not a string", tax_id))?;
+            let str_rank = rank.as_str().ok_or_else(|| TaxonomyError::ImportError {
+                line: 0,
+                msg: format!("Rank for {} is not a string", tax_id),
+            })?;
             ranks.push(TaxRank::from_str(str_rank)?);
         } else {
             ranks.push(TaxRank::Unspecified);
@@ -134,7 +163,10 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         if let Some(children) = node.get("children") {
             for child in children
                 .as_array()
-                .ok_or_else(|| format_err!("Children for {} is not an array", tax_id))?
+                .ok_or_else(|| TaxonomyError::ImportError {
+                    line: 0,
+                    msg: format!("Children for {} is not an array", tax_id),
+                })?
             {
                 add_node(loc, child, tax_ids, parent_ids, names, ranks)?;
             }

@@ -1,6 +1,5 @@
 //! Code related to handling of taxonomic ranks
-use failure::Error;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 use crate::{Result, TaxonomyError};
@@ -142,7 +141,7 @@ impl TaxRank {
 }
 
 impl FromStr for TaxRank {
-    type Err = Error;
+    type Err = TaxonomyError;
 
     fn from_str(s: &str) -> Result<Self> {
         // many of these synonyms (and the ranks themselves) were pulled from:
@@ -186,8 +185,7 @@ impl FromStr for TaxRank {
             "no rank" => Ok(TaxRank::Unspecified),
             _ => Err(TaxonomyError::UnrecognizedRank {
                 rank: s.to_string(),
-            }
-            .into()),
+            }),
         }
     }
 }

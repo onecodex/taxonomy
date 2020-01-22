@@ -8,7 +8,7 @@ use memchr::memchr2;
 
 use crate::base::GeneralTaxonomy;
 use crate::taxonomy::Taxonomy;
-use crate::Result;
+use crate::{Result, TaxonomyError};
 
 // TODO: add "use name intead of id" options?
 /// NewickToken is used as an intermediate during the tokenization of a Newick string.
@@ -152,11 +152,23 @@ where
                     .map(|x| x + cur_pos)
                     .unwrap_or_else(|| buffer.len());
                 let name_dist = &buffer[cur_pos..pos];
-                let mut chunk_iter = str::from_utf8(name_dist)?
+                let mut chunk_iter = str::from_utf8(name_dist)
+                    .map_err(|_| TaxonomyError::ImportError {
+                        line: 0,
+                        msg: format!(
+                            "Could not parse name/dist \"{}\" as unicode",
+                            String::from_utf8_lossy(name_dist)
+                        ),
+                    })?
                     .trim_end_matches(';')
                     .splitn(2, |x| x == ':');
                 tax_ids[cur_node] = chunk_iter.next().unwrap_or("").to_string();
-                dists[cur_node] = chunk_iter.next().unwrap_or("1").parse()?;
+                dists[cur_node] = chunk_iter.next().unwrap_or("1").parse().map_err(|_| {
+                    TaxonomyError::ImportError {
+                        line: 0,
+                        msg: "Could not parse distance {} as a number".to_string(),
+                    }
+                })?;
                 cur_pos = pos;
             }
         }
