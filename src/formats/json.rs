@@ -48,20 +48,52 @@ where
     }
 }
 
-pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
-    let tax_links = tax_json["links"]
-        .as_array()
-        .ok_or_else(|| TaxonomyError::ImportError {
-            line: 0,
-            msg: "'links' not in JSON".to_string(),
-        })?;
-    let tax_nodes = tax_json["nodes"]
-        .as_array()
-        .ok_or_else(|| TaxonomyError::ImportError {
-            line: 0,
-            msg: "'nodes' not in JSON".to_string(),
-        })?;
-    let mut parent_ids = vec![0; tax_nodes.len()];
+fn get_id(node: &Value, field: &str) -> Result<String> {
+    node[field].as_u64().map_or_else(
+        || {
+            node[field]
+                .as_str()
+                .ok_or_else(|| TaxonomyError::ImportError {
+                    line: 0,
+                    msg: format!("{}s must be strings or numbers", field),
+                })
+                .map(|id| id.to_string())
+        },
+        |id| Ok(id.to_string()),
+    )
+}
+
+fn get_new_node_link_parents(tax_links: &[Value], nodes: &[String]) -> Result<Vec<usize>> {
+    let lookup: HashMap<&str, usize> = nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.as_ref(), i))
+        .collect();
+    let mut parent_ids = vec![0; nodes.len()];
+    for l in tax_links {
+        let str_source = get_id(l, "source")?;
+        let source =
+            lookup
+                .get(&str_source.as_ref())
+                .ok_or_else(|| TaxonomyError::ImportError {
+                    line: 0,
+                    msg: format!("link source \"{}\" is not present in nodes", str_source),
+                })?;
+        let str_target = get_id(l, "target")?;
+        let target =
+            lookup
+                .get(&str_target.as_ref())
+                .ok_or_else(|| TaxonomyError::ImportError {
+                    line: 0,
+                    msg: format!("link target \"{}\" is not present in nodes", str_target),
+                })?;
+        parent_ids[*source] = *target;
+    }
+    Ok(parent_ids)
+}
+
+fn get_old_node_link_parents(tax_links: &[Value], nodes: &[String]) -> Result<Vec<usize>> {
+    let mut parent_ids = vec![0; nodes.len()];
     for l in tax_links {
         let source = l["source"]
             .as_u64()
@@ -69,31 +101,49 @@ pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
                 line: 0,
                 msg: "link source is bad".to_string(),
             })? as usize;
+        if source >= nodes.len() {
+            return Err(TaxonomyError::ImportError {
+                line: 0,
+                msg: format!(
+                    "JSON source index {} specified, but there are only {} nodes",
+                    source,
+                    nodes.len()
+                ),
+            });
+        }
         let target = l["target"]
             .as_u64()
             .ok_or_else(|| TaxonomyError::ImportError {
                 line: 0,
                 msg: "link target is bad".to_string(),
             })? as usize;
+        if target >= nodes.len() {
+            return Err(TaxonomyError::ImportError {
+                line: 0,
+                msg: format!(
+                    "JSON target index {} specified, but there are only {} nodes",
+                    target,
+                    nodes.len()
+                ),
+            });
+        }
         parent_ids[source] = target;
     }
+    Ok(parent_ids)
+}
 
+pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
+    let tax_nodes = tax_json["nodes"]
+        .as_array()
+        .ok_or_else(|| TaxonomyError::ImportError {
+            line: 0,
+            msg: "'nodes' not in JSON".to_string(),
+        })?;
     let mut tax_ids = Vec::new();
     let mut names = Vec::new();
     let mut ranks = Vec::new();
     for n in tax_nodes.iter() {
-        let ncbi_id = n["id"].as_u64().map_or_else(
-            || {
-                n["id"]
-                    .as_str()
-                    .ok_or_else(|| TaxonomyError::ImportError {
-                        line: 0,
-                        msg: "IDs must be strings or numbers".to_string(),
-                    })
-                    .map(|id| id.to_string())
-            },
-            |id| Ok(id.to_string()),
-        )?;
+        let ncbi_id = get_id(&n, "id")?;
         tax_ids.push(ncbi_id);
         let name = n["name"]
             .as_str()
@@ -117,6 +167,40 @@ pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         ranks.push(rank);
     }
 
+    let tax_links = tax_json["links"]
+        .as_array()
+        .ok_or_else(|| TaxonomyError::ImportError {
+            line: 0,
+            msg: "'links' not in JSON".to_string(),
+        })?;
+
+    // check if this is an "old" format (networkx <=1.10) or not
+    // the old format used an index into the nodes array instead of the id
+    // itself and since this is a tree, every source node's index should be
+    // present once
+    //
+    // note the format change is only documented one place (and obliquely):
+    // https://github.com/networkx/networkx/issues/2332
+    let is_old_format = tax_links
+        .iter()
+        .try_fold(0, |acc, link| {
+            if let Some(source) = link["source"].as_u64() {
+                Some(acc + source)
+            } else {
+                None
+            }
+        })
+        .map_or_else(
+            || false,
+            |source_sum| source_sum == (tax_links.len() * (tax_links.len() + 1)) as u64 / 2u64,
+        );
+
+    let parent_ids = if is_old_format {
+        get_old_node_link_parents(tax_links, &tax_ids)?
+    } else {
+        get_new_node_link_parents(tax_links, &tax_ids)?
+    };
+
     GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None)
 }
 
@@ -129,12 +213,22 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         names: &mut Vec<String>,
         ranks: &mut Vec<TaxRank>,
     ) -> Result<()> {
-        let tax_id = node["id"]
-            .as_str()
-            .ok_or_else(|| TaxonomyError::ImportError {
-                line: 0,
-                msg: "All entries need IDs".to_string(),
-            })?;
+        let tax_id = get_id(&node, "id").map_err(|_| {
+            if parent_ids.is_empty() {
+                TaxonomyError::ImportError {
+                    line: 0,
+                    msg: "Root entry needs an `id`".to_string(),
+                }
+            } else {
+                let id_list = parent_ids
+                    .iter()
+                    .fold(String::new(), |a, id| a + &tax_ids[*id] + ".");
+                TaxonomyError::ImportError {
+                    line: 0,
+                    msg: format!("Entry at {} missing `id`", id_list),
+                }
+            }
+        })?;
         tax_ids.push(tax_id.to_string());
         parent_ids.push(parent_loc);
         if let Some(name) = node.get("name") {
@@ -150,11 +244,16 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
             names.push("".to_string());
         }
         if let Some(rank) = node.get("rank") {
-            let str_rank = rank.as_str().ok_or_else(|| TaxonomyError::ImportError {
-                line: 0,
-                msg: format!("Rank for {} is not a string", tax_id),
-            })?;
-            ranks.push(TaxRank::from_str(str_rank)?);
+            let tax_rank = if rank.is_null() {
+                TaxRank::Unspecified
+            } else {
+                let str_rank = rank.as_str().ok_or_else(|| TaxonomyError::ImportError {
+                    line: 0,
+                    msg: format!("Rank for {} is not a string", tax_id),
+                })?;
+                TaxRank::from_str(str_rank)?
+            };
+            ranks.push(tax_rank);
         } else {
             ranks.push(TaxRank::Unspecified);
         }
@@ -208,7 +307,7 @@ where
     let json_data = if as_node_link {
         save_node_link_json(tax, root_node)?
     } else {
-        save_tree_json(tax, root_node)?
+        save_tree_json(tax, root_node.unwrap_or_else(|| tax.root()))?
     };
     to_writer(writer, &json_data)?;
     Ok(())
@@ -220,11 +319,7 @@ where
     D: Debug + PartialOrd + Sum,
     X: Taxonomy<'t, T, D>,
 {
-    let root_id = if let Some(tid) = root_node {
-        tid
-    } else {
-        tax.root()
-    };
+    let root_id = root_node.unwrap_or_else(|| tax.root());
     let mut id_to_idx: HashMap<T, usize> = HashMap::new();
 
     let mut nodes: Vec<Value> = Vec::new();
@@ -257,20 +352,15 @@ where
     Ok(tax_json)
 }
 
-pub fn save_tree_json<'t, T: 't, D: 't, X>(tax: &'t X, root_node: Option<T>) -> Result<Value>
+pub fn save_tree_json<'t, T: 't, D: 't, X>(tax: &'t X, tax_id: T) -> Result<Value>
 where
     T: Clone + Debug + Display + PartialEq,
     D: Debug + PartialOrd + Sum,
     X: Taxonomy<'t, T, D>,
 {
-    let tax_id = if let Some(tid) = root_node {
-        tid
-    } else {
-        tax.root()
-    };
     let mut children: Vec<Value> = Vec::new();
     for child in tax.children(tax_id.clone())? {
-        children.push(save_tree_json(tax, Some(child))?);
+        children.push(save_tree_json(tax, child)?);
     }
 
     let name = tax.name(tax_id.clone())?;
@@ -294,13 +384,13 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_node_link_import() -> Result<()> {
+    fn test_old_node_link_import() -> Result<()> {
         // try a basically empty taxonomy
         let example = r#"{"nodes": [], "links": []}"#;
         let tax: GeneralTaxonomy = load_json(Cursor::new(example), None)?;
         assert_eq!(Taxonomy::<usize, _>::len(&tax), 0);
 
-        // try a really minimal one to make sure everything's in the right spot
+        // try a minimal one to make sure everything's in the right spot
         let example = r#"{
             "nodes": [
                 {"id": "1", "name": "root"},
@@ -317,6 +407,70 @@ mod test {
         assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
         assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
         assert_eq!(Taxonomy::<usize, _>::children(&tax, 0)?, vec![1]);
+        assert_eq!(Taxonomy::<usize, _>::lineage(&tax, 2)?, vec![2, 1, 0]);
+
+        // try one with integers for the ids
+        let example = r#"{
+            "nodes": [
+                {"id": 1, "name": "root"},
+                {"id": 2, "name": "Bacteria", "rank": "no rank"},
+                {"id": 562, "name": "Escherichia coli", "rank": "species"}
+            ],
+            "links": [
+                {"source": 1, "target": 0},
+                {"source": 2, "target": 1}
+            ]
+        }"#;
+        let tax = load_json(Cursor::new(example), None)?;
+        assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
+        assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
+        assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
+        assert_eq!(Taxonomy::<usize, _>::children(&tax, 0)?, vec![1]);
+        assert_eq!(Taxonomy::<usize, _>::lineage(&tax, 2)?, vec![2, 1, 0]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_new_node_link_import() -> Result<()> {
+        // try a minimal one to make sure everything's in the right spot
+        let example = r#"{
+            "nodes": [
+                {"id": "1", "name": "root"},
+                {"id": "2", "name": "Bacteria", "rank": "no rank"},
+                {"id": "562", "name": "Escherichia coli", "rank": "species"}
+            ],
+            "links": [
+                {"source": "2", "target": "1"},
+                {"source": "562", "target": "2"}
+            ]
+        }"#;
+        let tax = load_json(Cursor::new(example), None)?;
+        assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
+        assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
+        assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
+        assert_eq!(Taxonomy::<usize, _>::children(&tax, 0)?, vec![1]);
+        assert_eq!(Taxonomy::<usize, _>::lineage(&tax, 2)?, vec![2, 1, 0]);
+
+        // try one with integer keys (and a null rank)
+        let example = r#"{
+            "nodes": [
+                {"id": 1, "name": "root"},
+                {"id": 2, "name": "Bacteria", "rank": null},
+                {"id": 562, "name": "Escherichia coli", "rank": "species"}
+            ],
+            "links": [
+                {"source": 2, "target": 1},
+                {"source": 562, "target": 2}
+            ]
+        }"#;
+        let tax = load_json(Cursor::new(example), None)?;
+        assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
+        assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
+        assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
+        assert_eq!(Taxonomy::<usize, _>::children(&tax, 0)?, vec![1]);
+        assert_eq!(Taxonomy::<usize, _>::lineage(&tax, 2)?, vec![2, 1, 0]);
+
         Ok(())
     }
 
@@ -353,6 +507,23 @@ mod test {
         assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
         assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
         assert_eq!(Taxonomy::<usize, _>::children(&tax, 0)?, vec![1]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_bad_tree_imports() -> Result<()> {
+        // no id at root
+        let example = r#"{}"#;
+        assert!(load_json(Cursor::new(example), None).is_err());
+
+        // no id below root
+        let example = r#"{"id": "1", "children": [{}]}"#;
+        assert!(load_json(Cursor::new(example), None).is_err());
+
+        // rank as a number
+        let example = r#"{"id": "1", "rank": 5}"#;
+        assert!(load_json(Cursor::new(example), None).is_err());
+
         Ok(())
     }
 
