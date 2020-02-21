@@ -151,7 +151,6 @@ impl GeneralTaxonomy {
     ///
     /// Because the `Taxonomy` trait is implemented for internal IDs also,
     /// the can be used to speed up some operations by avoiding a string lookup.
-    #[allow(clippy::wrong_self_convention)]
     #[inline]
     pub fn from_internal_id(&self, tax_id: IntTaxId) -> Result<&str> {
         if tax_id as usize >= self.tax_ids.len() {
