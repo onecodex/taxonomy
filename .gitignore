@@ -2,6 +2,7 @@
 *.pyc
 *.swp
 .DS_Store
+.idea/
 
 taxonomy.*.so
 /build
