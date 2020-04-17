@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/taxonomy.svg)](https://pypi.org/project/taxonomy/)
 [![Crates version](https://img.shields.io/crates/v/taxonomy.svg)](https://crates.io/crates/taxonomy)
-[![CircleCI](https://circleci.com/gh/onecodex/taxonomy.svg?style=shield)](https://circleci.com/gh/onecodex/taxonomy)
+![CI](https://github.com/onecodex/taxonomy/workflows/CI/badge.svg)
 
 This is a Rust library for reading, writing, and editing biological taxonomies. There are associated Python bindings for accessing most of the functionality from Python.
 
