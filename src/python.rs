@@ -30,6 +30,7 @@ create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::Exception);
 /// ids in pre-order fashion and indexing into the Taxonomy object with a
 /// taxonomy id will return a tuple of the name and rank of that id.
 #[pyclass]
+#[derive(Debug)]
 pub struct Taxonomy {
     t: GeneralTaxonomy,
 }
@@ -445,18 +446,20 @@ impl PyIterProtocol for TaxonomyIterator {
                 slf.nodes_left.pop().unwrap() // postorder
             } else {
                 slf.visited_nodes.push(cur_node.clone());
-                let tax: &Taxonomy = slf.t.extract(py)?;
+                let tax: PyRef<Taxonomy> = slf.t.extract(py)?;
                 let children = tax
                     .t
                     .children(cur_node)
                     .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+                // drop the reference to tax, we don't need it anymore
+                drop(tax);
                 if !children.is_empty() {
                     slf.nodes_left.extend(children);
                 }
                 cur_node // preorder
             };
             if node_visited == !traverse_preorder {
-                let tax: &Taxonomy = slf.t.extract(py)?;
+                let tax: PyRef<Taxonomy> = slf.t.extract(py)?;
                 return Ok(Some(
                     tax.t
                         .from_internal_id(node)
@@ -528,7 +531,6 @@ fn taxonomy(py: Python, m: &PyModule) -> PyResult<()> {
         .dict()
         .get_item("modules")
         .unwrap()
-        .downcast_mut::<PyDict>()?
         .set_item("taxonomy.weights", m_weights)?;
 
     Ok(())
@@ -540,10 +542,10 @@ mod test {
     use pyo3::types::PyDict;
 
     use crate::base::test::create_example;
-    use crate::rank::TaxRank;
     use crate::taxonomy::Taxonomy as TaxTrait;
 
     use super::{weights, Taxonomy};
+    use crate::TaxRank;
 
     fn setup_ctx(py: Python) -> PyResult<Option<&PyDict>> {
         let tax = Py::new(
@@ -641,25 +643,29 @@ mod test {
         let py = gil.python();
         let ctx = setup_ctx(py)?;
 
-        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         let n_tax_items = TaxTrait::<&str, _>::len(&tax.t);
+        drop(tax);
 
         assert!(py
             .eval(r#"tax.add("bad id", "new id")"#, None, ctx)
             .is_err());
         py.eval(r#"tax.add("1236", "91347")"#, None, ctx)?;
-        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), n_tax_items + 1);
+        drop(tax);
 
         assert!(py.eval(r#"tax.remove("bad id")"#, None, ctx).is_err());
         py.eval(r#"tax.remove("135622")"#, None, ctx)?;
-        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), n_tax_items);
+        drop(tax);
 
         assert!(py.eval(r#"del tax["bad id"])"#, None, ctx).is_err());
         py.run(r#"del tax["1046"]"#, None, ctx)?;
-        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), n_tax_items - 1);
+        drop(tax);
 
         // FIXME: make these fail?
         // assert!(py.eval(r#"tax.prune(keep=["bad id"])"#, None, ctx).is_err());
@@ -674,18 +680,20 @@ mod test {
     fn test_change() -> PyResult<()> {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        let ctx = setup_ctx(py)?;
+        let ctx = setup_ctx(py).expect("setup context");
 
         assert!(py
             .eval(r#"tax.change("bad id", name="New Name")"#, None, ctx)
             .is_err());
         py.eval(r#"tax.change("135622", name="New Name")"#, None, ctx)?;
-        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(tax.t.name("135622").unwrap(), "New Name");
+        drop(tax);
 
         py.eval(r#"tax.change("135622", rank="genus")"#, None, ctx)?;
-        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(tax.t.rank("135622").unwrap(), TaxRank::Genus);
+        drop(tax);
 
         assert!(py
             .eval(r#"tax.change("2", parent_id="135622")"#, None, ctx,)
@@ -701,8 +709,9 @@ mod test {
             None,
             ctx,
         )?;
-        let tax: &Taxonomy = ctx.unwrap().get_item("tax").unwrap().extract()?;
+        let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(tax.t.parent("135622").unwrap(), Some(("2", 3.5)));
+        drop(tax);
 
         Ok(())
     }
@@ -732,12 +741,12 @@ mod test {
         let py = gil.python();
         let ctx = setup_ctx(py)?;
 
-        let tax: &Taxonomy = py
+        let tax: PyRef<Taxonomy> = py
             .eval(r#"Taxonomy.from_newick("(A,B)C;")"#, None, ctx)?
             .extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), 3);
 
-        let tax: &Taxonomy = py
+        let tax: PyRef<Taxonomy> = py
             .eval(
                 r#"Taxonomy.from_json("{\"nodes\": [], \"links\": []}")"#,
                 None,
@@ -746,12 +755,12 @@ mod test {
             .extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), 0);
 
-        let tax: &Taxonomy = py
+        let tax: PyRef<Taxonomy> = py
             .eval(r#"Taxonomy.from_json("{\"id\": \"1\"}")"#, None, ctx)?
             .extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), 1);
 
-        let tax: &Taxonomy = py
+        let tax: PyRef<Taxonomy> = py
             .eval(
                 r#"Taxonomy.from_json("{\"test\": {\"id\": \"1\"}}", path=["test"])"#,
                 None,
@@ -760,12 +769,12 @@ mod test {
             .extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), 1);
 
-        let tax: &Taxonomy = py
+        let tax: PyRef<Taxonomy> = py
             .eval(r#"Taxonomy.from_phyloxml("<phylogeny rooted=\"true\"><clade><id>root</id></clade></phylogeny>")"#, None, ctx)?
             .extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), 1);
 
-        let tax: &Taxonomy = py
+        let tax: PyRef<Taxonomy> = py
             .eval(r#"Taxonomy.from_ncbi("tests/data/ncbi_subset_tax.nodes.dmp", "tests/data/ncbi_subset_tax.names.dmp")"#, None, ctx)?
             .extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), 9);
