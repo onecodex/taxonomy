@@ -15,6 +15,17 @@ The library ships with a number of features:
  - [X] Easily extensible (in Rust) to support other formats and operations
 
 
+## Installation
+
+### Rust
+This library can be added to an existing Cargo.toml file and installed straight from crates.io.
+
+### Python
+You can install the Python bindings directly from PyPI (binaries are only built for select architextures) with:
+```bash
+pip install taxonomy
+```
+
 ## Python Usage
 
 The Python taxonomy API can open and manipulate all of the formats from the Rust library.
@@ -40,8 +51,8 @@ Assuming that the taxonomy has been instantiated as a variable named `tax`.
 
 1. `tax.to_newick()`: exports a Taxonomy as a Newick-encoded byte string.
 
-2. `tax.to_json(/, as_node_link: bool)`: exports a Taxonomy as a JSON-encoded byte string. By default, the JSON format 
-is a tree format unless the `as_node_link` parameter is set to True.
+2. `tax.to_json(/, as_node_link_data: bool)`: exports a Taxonomy as a JSON-encoded byte string. By default, the JSON format 
+is a tree format unless the `as_node_link_data` parameter is set to True.
 
 ### Using a taxonomy
 
@@ -63,7 +74,7 @@ will raise an exception even if the documentation below does not mention it.
 #### `tax.root -> TaxonomyNode`
 Points to the root of the taxonomy
 
-#### `tax.parent(tax_id: str, /, at_rank: str) -> (Optional[TaxonomyNode], Optional[float])`
+#### `tax.get_parent(tax_id: str, /, at_rank: str) -> (Optional[TaxonomyNode], Optional[float])`
 Return the immediate parent TaxonomyNode of the node id provided as well as the distance to it as a `(TaxonomyNode, float)` tuple.
 
 If `at_rank` is provided, scan all the nodes in the node's lineage and return
@@ -72,14 +83,14 @@ the parent id at that rank.
 Examples:
 
 ```py
-parent, distance = tax.parent("612")
-parent, _ = tax.parent("612", at_rank="species")
-parent, distance = tax.parent("612")
+parent, distance = tax.get_parent("612")
+parent, _ = tax.get_parent("612", at_rank="species")
+parent, distance = tax.get_parent("612")
 # Both variables will be `None` if we can't find the parent
-parent, distance = tax.parent("unknown")
+parent, distance = tax.get_parent("unknown")
 ```
 
-#### `tax.find_by(tax_id: str) -> Optional[TaxonomyNode]`
+#### `tax.get(tax_id: str) -> Optional[TaxonomyNode]`
 
 Returns the node at that id. Returns `None` if not found.
 You can also use indexing to accomplish that: `tax["some_id"]` but this will raise an exception if the node
@@ -97,6 +108,10 @@ Returns all nodes below the given tax id.
 #### `tax.lineage(tax_id: str) -> List[TaxonomyNode]`
 
 Returns all nodes above the given tax id, including itself.
+
+#### `tax.parents(tax_id: str) -> List[TaxonomyNode]`
+
+Returns all nodes above the given tax id.
 
 #### `tax.lca(id1: str, id2: str) -> Optional[TaxonomyNode]`
 
@@ -123,20 +138,7 @@ Edit properties on a taxonomy node.
 
 ### Exceptions
 Only one exception is raised intentionally by the library: `TaxonomyError`.
-If you get a `pyo3_runtime.PanicException` (or anything with `pyo3` in its name), this is a bug in the underlying Rust library, please
-open an issue.
-
-## Installation
-
-### Rust
-This library can be added to an existing Cargo.toml file and installed straight from crates.io.
-
-### Python
-You can install the Python bindings directly from PyPI (binaries are only built for select architextures) with:
-```bash
-pip install taxonomy
-```
-
+If you get a `pyo3_runtime.PanicException` (or anything with `pyo3` in its name), this is a bug in the underlying Rust library, please open an issue.
 
 ## Development
 
