@@ -15,6 +15,10 @@ pub enum TaxonomyError {
     NoSuchKey {
         key: String,
     },
+    /// The given name could not be found in the taxonomy.
+    NoSuchName {
+        name: String,
+    },
     /// A string could not be parsed into a TaxRank.
     UnrecognizedRank {
         rank: String,
@@ -38,6 +42,7 @@ impl fmt::Display for TaxonomyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TaxonomyError::NoSuchKey { key } => write!(f, "Key is not valid: {}", key),
+            TaxonomyError::NoSuchName { name } => write!(f, "Name is not valid: {}", name),
             TaxonomyError::UnrecognizedRank { rank } => {
                 write!(f, "Rank is not supported: {}", rank)
             }

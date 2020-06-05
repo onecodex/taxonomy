@@ -25,6 +25,27 @@ use crate::weights::{maximum_weighted_path as tax_mwp, rollup_weights as tax_rw}
 
 create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::Exception);
 
+/// The data returned when looking up a taxonomy by id or by name
+#[pyclass]
+#[derive(Debug, Clone)]
+pub struct TaxonomyNode {
+    #[pyo3(get)]
+    id: String,
+    #[pyo3(get)]
+    name: String,
+    #[pyo3(get)]
+    parent: Option<String>,
+    #[pyo3(get)]
+    rank: String,
+}
+
+#[pyproto]
+impl PyObjectProtocol for TaxonomyNode {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("<TaxonomyNode (id={}))>", self.id))
+    }
+}
+
 /// The Taxonomy object provides the primary interface for exploring a
 /// biological taxonomy. Iterating over the Taxonomy returns all the taxonomy
 /// ids in pre-order fashion and indexing into the Taxonomy object with a
@@ -33,6 +54,56 @@ create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::Exception);
 #[derive(Debug)]
 pub struct Taxonomy {
     t: GeneralTaxonomy,
+}
+
+// Avoid some boilerplate with the error handling
+macro_rules! py_try {
+    ($call:expr) => {
+        $call.map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?
+    };
+}
+
+/// Some private fns we don't want to share in Python but that make the Python code easier to
+/// write
+impl Taxonomy {
+    pub(crate) fn get_int_id(&self, key: &str) -> PyResult<usize> {
+        self.t
+            .to_internal_id(key)
+            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))
+    }
+
+    pub(crate) fn get_name(&self, key: &str) -> PyResult<&str> {
+        let name = py_try!(self.t.name(key));
+        Ok(name)
+    }
+
+    pub(crate) fn get_rank(&self, key: &str) -> PyResult<&str> {
+        let rank = py_try!(self.t.rank(key)).to_ncbi_rank();
+        Ok(rank)
+    }
+
+    pub(crate) fn as_node(&self, key: &str) -> PyResult<TaxonomyNode> {
+        let name = self.get_name(key)?;
+        let rank = self.get_rank(key)?;
+        let parent = py_try!(self.t.parent(key)).map(|(p, _)| p.to_string());
+
+        Ok(TaxonomyNode {
+            id: key.to_string(),
+            name: name.to_string(),
+            rank: rank.to_string(),
+            parent,
+        })
+    }
+}
+
+#[pyproto]
+impl PyObjectProtocol for Taxonomy {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "<Taxonomy ({} nodes)>",
+            TaxTrait::<IntTaxId, _>::len(&self.t)
+        ))
+    }
 }
 
 #[pymethods]
@@ -47,8 +118,7 @@ impl Taxonomy {
     #[classmethod]
     fn from_json(_cls: &PyType, value: &str, path: Option<Vec<&str>>) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
-        let t = load_json(&mut c, path.as_deref())
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        let t = py_try!(load_json(&mut c, path.as_deref()));
         Ok(Taxonomy { t })
     }
 
@@ -59,8 +129,7 @@ impl Taxonomy {
     #[classmethod]
     fn from_newick(_cls: &PyType, value: &str) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
-        let t =
-            load_newick(&mut c).map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        let t = py_try!(load_newick(&mut c));
         Ok(Taxonomy { t })
     }
 
@@ -74,8 +143,7 @@ impl Taxonomy {
     fn from_ncbi(_cls: &PyType, nodes_path: &str, names_path: &str) -> PyResult<Taxonomy> {
         let nodes_file = File::open(nodes_path)?;
         let names_file = File::open(names_path)?;
-        let t = load_ncbi(nodes_file, names_file)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        let t = py_try!(load_ncbi(nodes_file, names_file));
         Ok(Taxonomy { t })
     }
 
@@ -88,21 +156,24 @@ impl Taxonomy {
     #[classmethod]
     fn from_phyloxml(_cls: &PyType, value: &str) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
-        let t =
-            load_phyloxml(&mut c).map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        let t = py_try!(load_phyloxml(&mut c));
         Ok(Taxonomy { t })
     }
 
-    /// to_json(self, /, as_node_link: bool)
+    /// to_json(self, /, as_node_link_data: bool)
     /// --
     ///
     /// Export a Taxonomy as a JSON-encoded byte string. By default, the JSON format
-    /// is a tree format unless the `as_node_link` parameter is set to True.
-    #[args(as_node_link = false)]
-    fn to_json(&self, as_node_link: bool) -> PyResult<PyObject> {
+    /// is a tree format unless the `as_node_link_data` parameter is set to True.
+    #[args(as_node_link_data = false)]
+    fn to_json(&self, as_node_link_data: bool) -> PyResult<PyObject> {
         let mut s = Vec::new();
-        save_json::<&str, _, _, _>(&self.t, &mut s, None, as_node_link)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        py_try!(save_json::<&str, _, _, _>(
+            &self.t,
+            &mut s,
+            None,
+            as_node_link_data
+        ));
 
         let gil = Python::acquire_gil();
         let py = gil.python();
@@ -115,127 +186,138 @@ impl Taxonomy {
     /// Export a Taxonomy as a Newick-encoded byte string.
     fn to_newick(&self) -> PyResult<PyObject> {
         let mut s = Vec::new();
-        save_newick::<&str, _, _, _>(&self.t, &mut s, None)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        py_try!(save_newick::<&str, _, _, _>(&self.t, &mut s, None));
 
         let gil = Python::acquire_gil();
         let py = gil.python();
         Ok(PyBytes::new(py, &s).into())
     }
 
-    /// parent(self, id: str, /, at_rank: str, include_dist: bool)
+    /// get(self, tax_id: str) -> Optional[TaxonomyNode]
+    /// --
+    ///
+    /// Find a node by its id. Returns `None` if not found
+    fn get(&self, tax_id: &str) -> Option<TaxonomyNode> {
+        self.as_node(tax_id).ok()
+    }
+
+    /// find_by_name(self, name: str) -> TaxonomyNode
+    /// --
+    ///
+    /// Find a node by its name, Raises an exception if not found.
+    fn find_by_name(&self, name: &str) -> Option<TaxonomyNode> {
+        if let Ok(tax_id) = self.t.find_by_name(name) {
+            self.as_node(tax_id).ok()
+        } else {
+            None
+        }
+    }
+
+    /// get_parent_with_distance(self, tax_id: str, /, at_rank: str)
+    /// --
+    ///
+    /// Return the immediate parent taxonomy node of the node id provided and the distance to it
+    ///
+    /// If `at_rank` is provided, scan all the nodes in the node's lineage and return
+    /// the parent id at that rank.
+    fn get_parent_with_distance(
+        &self,
+        tax_id: &str,
+        at_rank: Option<&str>,
+    ) -> PyResult<(Option<TaxonomyNode>, Option<f32>)> {
+        let parent_res = if let Some(rank) = at_rank {
+            if let Ok(rank) = TaxRank::from_str(rank) {
+                self.t.parent_at_rank(tax_id, rank)
+            } else {
+                return Err(PyErr::new::<TaxonomyError, _>(format!(
+                    "Rank {} could not be understood",
+                    rank
+                )));
+            }
+        } else {
+            self.t.parent(tax_id)
+        };
+
+        if let Ok(Some((id, distance))) = parent_res {
+            Ok((self.as_node(id).ok(), Some(distance)))
+        } else {
+            Ok((None, None))
+        }
+    }
+    /// get_parent(self, tax_id: str, /, at_rank: str)
     /// --
     ///
     /// Return the immediate parent taxonomy node of the node id provided.
     ///
     /// If `at_rank` is provided, scan all the nodes in the node's lineage and return
     /// the parent id at that rank.
-    ///
-    /// If `include_dist` is provided, return the distance from the node id provided
-    /// to the parent returned.
-    #[args(include_dist = false)]
-    fn parent(
-        &self,
-        id: &str,
-        at_rank: Option<&str>,
-        include_dist: bool,
-    ) -> PyResult<Option<PyObject>> {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-
-        if let Some(rank) = at_rank {
-            if let Ok(rank) = TaxRank::from_str(rank) {
-                self.t
-                    .parent_at_rank(id, rank)
-                    .map(|o| {
-                        o.map(|(i, d)| {
-                            if include_dist {
-                                (i.to_string(), d).to_object(py)
-                            } else {
-                                i.to_string().to_object(py)
-                            }
-                        })
-                    })
-                    .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))
-            } else {
-                Err(PyErr::new::<TaxonomyError, _>(format!(
-                    "Rank {} could not be understood",
-                    rank
-                )))
-            }
-        } else {
-            self.t
-                .parent(id)
-                .map(|o| {
-                    o.map(|(i, d)| {
-                        if include_dist {
-                            (i.to_string(), d).to_object(py)
-                        } else {
-                            i.to_string().to_object(py)
-                        }
-                    })
-                })
-                .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))
-        }
+    fn get_parent(&self, tax_id: &str, at_rank: Option<&str>) -> PyResult<Option<TaxonomyNode>> {
+        let (node, _) = self.get_parent_with_distance(tax_id, at_rank)?;
+        Ok(node)
     }
 
-    /// children(self, id: str)
+    /// children(self, tax_id: str)
     /// --
     ///
     /// Return a list of child taxonomy nodes from the node id provided.
-    fn children(&self, id: &str) -> PyResult<Vec<String>> {
-        self.t
-            .children(id)
-            .map(|v| v.into_iter().map(|i| i.to_string()).collect())
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))
+    fn children(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+        let children: Vec<&str> = py_try!(self.t.children(tax_id));
+        let mut res = Vec::with_capacity(children.len());
+        for key in children {
+            let child = self.get(key);
+            if let Some(c) = child {
+                res.push(c);
+            } else {
+                return Err(PyErr::new::<TaxonomyError, _>(format!(
+                    "Node {} is missing in children",
+                    key
+                )));
+            }
+        }
+
+        Ok(res)
     }
 
-    /// lineage(self, id: str)
+    /// lineage(self, tax_id: str)
     /// --
     ///
     /// Return a list of all the parent taxonomy nodes of the node id provided
     /// (including that node itself).
-    fn lineage(&self, id: &str) -> PyResult<Vec<String>> {
-        self.t
-            .lineage(id)
-            .map(|v| v.into_iter().map(|i| i.to_string()).collect())
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))
+    fn lineage(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+        let lineage: Vec<&str> = py_try!(self.t.lineage(tax_id));
+        let mut res = Vec::with_capacity(lineage.len());
+        for key in lineage {
+            let ancestor = self.get(key);
+            if let Some(a) = ancestor {
+                res.push(a);
+            } else {
+                return Err(PyErr::new::<TaxonomyError, _>(format!(
+                    "Node {} is missing in lineage",
+                    key
+                )));
+            }
+        }
+
+        Ok(res)
+    }
+
+    /// parents(self, tax_id: str)
+    /// --
+    ///
+    /// Return a list of all the parent taxonomy nodes of the node id provided.
+    fn parents(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+        let mut lineage = self.lineage(tax_id)?;
+        lineage.drain(..1);
+        Ok(lineage)
     }
 
     /// lca(self, id1: str, id2: str)
     /// --
     ///
     /// Return the lowest common ancestor of two taxonomy nodes.
-    fn lca(&self, id1: &str, id2: &str) -> PyResult<String> {
-        self.t
-            .lca(id1, id2)
-            .map(|i| i.to_string())
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))
-    }
-
-    /// name(self, id: str)
-    /// --
-    ///
-    /// Return the name of the node id provided.
-    fn name(&self, id: &str) -> PyResult<String> {
-        let name = self
-            .t
-            .name(id)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
-        Ok(name.to_string())
-    }
-
-    /// rank(self, id: str)
-    /// --
-    ///
-    /// Return the taxonomic rank of the node id provided.
-    fn rank(&self, id: &str) -> PyResult<String> {
-        let rank = self
-            .t
-            .rank(id)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?
-            .to_ncbi_rank();
-        Ok(rank.to_string())
+    fn lca(&self, id1: &str, id2: &str) -> PyResult<Option<TaxonomyNode>> {
+        let lca_id = py_try!(self.t.lca(id1, id2));
+        Ok(self.get(lca_id))
     }
 
     /// prune(self, keep: List[str], remove: List[str])
@@ -245,15 +327,14 @@ impl Taxonomy {
     ///  - only the nodes in `keep` and their parents if provided
     ///  - all of the nodes except those in remove and their children if provided
     fn prune(&self, keep: Option<Vec<&str>>, remove: Option<Vec<&str>>) -> PyResult<Taxonomy> {
-        let mut t = self.t.clone();
+        let mut tax = self.t.clone();
         if let Some(k) = keep {
-            t = prune_to(&t, &k, false)
-                .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+            tax = py_try!(prune_to(&tax, &k, false));
         }
         if let Some(r) = remove {
-            t = prune_away(&t, &r).map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+            tax = py_try!(prune_away(&tax, &r));
         }
-        Ok(Taxonomy { t })
+        Ok(Taxonomy { t: tax })
     }
 
     /// remove(self, tax_id: str)
@@ -261,13 +342,8 @@ impl Taxonomy {
     ///
     /// Remove the node from the tree.
     fn remove(&mut self, tax_id: &str) -> PyResult<()> {
-        let int_id = self
-            .t
-            .to_internal_id(tax_id)
-            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))?;
-        self.t
-            .remove(int_id)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        let int_id = self.get_int_id(tax_id)?;
+        py_try!(self.t.remove(int_id));
         Ok(())
     }
 
@@ -276,32 +352,25 @@ impl Taxonomy {
     ///
     /// Add a new node to the tree at the parent provided.
     fn add(&mut self, parent_id: &str, tax_id: &str) -> PyResult<()> {
-        let int_id = self
-            .t
-            .to_internal_id(parent_id)
-            .map_err(|_| PyErr::new::<KeyError, _>("Parent tax ID is not in taxonomy"))?;
-        self.t
-            .add(int_id, tax_id)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
+        let int_id = self.get_int_id(parent_id)?;
+        py_try!(self.t.add(int_id, tax_id));
         Ok(())
     }
 
-    /// change(self, tax_id: str, /, name: str, rank: str, parent_id: str, parent_dist: float)
+    /// edit_node(self, tax_id: str, /, name: str, rank: str, parent_id: str, parent_dist: float)
     /// --
     ///
-    /// Change properties on the taxonomy node.
-    fn change(
+    /// Edit properties on a taxonomy node.
+    fn edit_node(
         &mut self,
         tax_id: &str,
         name: Option<&str>,
         rank: Option<&str>,
         parent_id: Option<&str>,
-        parent_dist: Option<f32>,
+        parent_distance: Option<f32>,
     ) -> PyResult<()> {
-        let int_id = self
-            .t
-            .to_internal_id(tax_id)
-            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))?;
+        let int_id = self.get_int_id(tax_id)?;
+
         if let Some(r) = rank {
             self.t.ranks[int_id] = TaxRank::from_str(r)
                 .map_err(|_| PyErr::new::<TaxonomyError, _>("Rank could not be understood"))?;
@@ -327,7 +396,7 @@ impl Taxonomy {
             }
             self.t.parent_ids[int_id] = parent;
         }
-        if let Some(p) = parent_dist {
+        if let Some(p) = parent_distance {
             if int_id == TaxTrait::<IntTaxId, _>::root(&self.t) {
                 return Err(PyErr::new::<TaxonomyError, _>("Root has no parent"));
             }
@@ -337,70 +406,36 @@ impl Taxonomy {
     }
 
     #[getter]
-    fn get_root(&self) -> PyResult<String> {
-        let root: &str = self.t.root();
-        Ok(root.to_string())
-    }
-}
-
-#[pyproto]
-impl PyObjectProtocol for Taxonomy {
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(format!(
-            "<Taxonomy ({} nodes)>",
-            TaxTrait::<IntTaxId, _>::len(&self.t)
-        ))
+    fn get_root(&self) -> TaxonomyNode {
+        let key: &str = self.t.root();
+        self.as_node(key).unwrap()
     }
 }
 
 #[pyproto]
 impl PyMappingProtocol for Taxonomy {
-    fn __getitem__(&self, key: &str) -> PyResult<(String, String)> {
-        // TODO: return namedtuple?
-
-        // let gil = Python::acquire_gil();
-        // let py = gil.python();
-        // let namedtuple = py.import("collections")?.get("namedtuple")?;
-
-        let int_id = self
-            .t
-            .to_internal_id(key)
-            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))?;
-        let name = self
-            .t
-            .name(int_id)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
-        let rank = self
-            .t
-            .rank(int_id)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?
-            .to_ncbi_rank();
-        Ok((name.to_string(), rank.to_string()))
+    fn __len__(&self) -> PyResult<usize> {
+        Ok(TaxTrait::<IntTaxId, _>::len(&self.t))
     }
 
     // TODO: way to set name and rank
     // TODO: also way to set parent and parent distance?
 
-    fn __delitem__(&mut self, key: &str) -> PyResult<()> {
-        let int_id = self
-            .t
-            .to_internal_id(key)
-            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))?;
-        self.t
-            .remove(int_id)
-            .map_err(|e| PyErr::new::<TaxonomyError, _>(format!("{}", e)))?;
-        Ok(())
+    fn __getitem__(&self, key: &str) -> PyResult<TaxonomyNode> {
+        self.as_node(key)
     }
 
-    fn __len__(&self) -> PyResult<usize> {
-        Ok(TaxTrait::<IntTaxId, _>::len(&self.t))
+    fn __delitem__(&mut self, key: &str) -> PyResult<()> {
+        let int_id = self.get_int_id(key)?;
+        py_try!(self.t.remove(int_id));
+        Ok(())
     }
 }
 
 #[pyproto]
 impl PySequenceProtocol for Taxonomy {
     fn __contains__(&self, key: &str) -> PyResult<bool> {
-        Ok(self.t.to_internal_id(key).is_ok())
+        Ok(self.get_int_id(key).is_ok())
     }
 }
 
@@ -522,6 +557,7 @@ fn weights(_py: Python, m: &PyModule) -> PyResult<()> {
 #[pymodule]
 fn taxonomy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Taxonomy>()?;
+    m.add("TaxonomyError", py.get_type::<TaxonomyError>())?;
 
     let m_weights = wrap_pymodule!(weights)(py);
     m.add("weights", &m_weights)?;
@@ -544,7 +580,7 @@ mod test {
     use crate::base::test::create_example;
     use crate::taxonomy::Taxonomy as TaxTrait;
 
-    use super::{weights, Taxonomy};
+    use super::{weights, Taxonomy, TaxonomyNode};
     use crate::TaxRank;
 
     fn setup_ctx(py: Python) -> PyResult<Option<&PyDict>> {
@@ -561,46 +597,154 @@ mod test {
     }
 
     #[test]
-    fn test_parent() -> PyResult<()> {
+    fn test_get() {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        let ctx = setup_ctx(py)?;
+        let ctx = setup_ctx(py).unwrap();
 
-        let parent: String = py.eval(r#"tax.parent("53452")"#, None, ctx)?.extract()?;
-        assert_eq!(parent, "1046");
+        let node: TaxonomyNode = py
+            .eval(r#"tax.get("53452")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(node.id, "53452");
+        assert_eq!(node.parent, Some("1046".to_string()));
+        assert_eq!(node.name, "Lamprocystis");
 
-        let parent: String = py
-            .eval(r#"tax.parent("53452", at_rank="phylum")"#, None, ctx)?
-            .extract()?;
-        assert_eq!(parent, "1224");
-
-        assert!(py.eval(r#"tax.parent("bad id")"#, None, ctx).is_err());
-        assert!(py
-            .eval(r#"tax.parent("bad id", at_rank="species")"#, None, ctx)
-            .is_err());
-        assert!(py
-            .eval(r#"tax.parent("53452", at_rank="bad rank")"#, None, ctx)
-            .is_err());
-        Ok(())
+        let node: Option<TaxonomyNode> = py
+            .eval(r#"tax.get("unknown")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert!(node.is_none());
     }
 
     #[test]
-    fn test_tree_methods() -> PyResult<()> {
+    fn test_find_by_name() {
         let gil = Python::acquire_gil();
         let py = gil.python();
-        let ctx = setup_ctx(py)?;
+        let ctx = setup_ctx(py).unwrap();
 
-        let children: Vec<String> = py.eval(r#"tax.children("53452")"#, None, ctx)?.extract()?;
-        assert_eq!(children, vec!["61598"]);
+        let node: TaxonomyNode = py
+            .eval(r#"tax.find_by_name("Lamprocystis")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(node.id, "53452");
+        assert_eq!(node.parent, Some("1046".to_string()));
+        assert_eq!(node.name, "Lamprocystis");
 
-        let lineage: Vec<String> = py.eval(r#"tax.lineage("1224")"#, None, ctx)?.extract()?;
-        assert_eq!(lineage, vec!["1224", "2", "131567", "1"]);
+        let node: Option<TaxonomyNode> = py
+            .eval(r#"tax.find_by_name("unknown")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert!(node.is_none());
+    }
 
-        let lca: String = py
-            .eval(r#"tax.lca("56812", "765909")"#, None, ctx)?
-            .extract()?;
-        assert_eq!(lca, "1236");
-        Ok(())
+    #[test]
+    fn test_get_parent() {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py).unwrap();
+
+        let parent: TaxonomyNode = py
+            .eval(r#"tax.get_parent("53452")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(parent.id, "1046");
+
+        let parent: TaxonomyNode = py
+            .eval(r#"tax.get_parent("53452", at_rank="phylum")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(parent.id, "1224");
+
+        let parent: Option<TaxonomyNode> = py
+            .eval(r#"tax.get_parent("bad id")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert!(parent.is_none());
+
+        let parent: Option<TaxonomyNode> = py
+            .eval(r#"tax.get_parent("bad id", at_rank="species")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert!(parent.is_none());
+
+        // A bad rank does raise
+        assert!(py
+            .eval(r#"tax.get_parent("53452", at_rank="bad rank")"#, None, ctx)
+            .is_err());
+    }
+
+    #[test]
+    fn test_children() {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py).unwrap();
+
+        let children: Vec<TaxonomyNode> = py
+            .eval(r#"tax.children("53452")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(
+            children.iter().map(|c| &c.id).collect::<Vec<_>>(),
+            vec!["61598"]
+        );
+    }
+
+    #[test]
+    fn test_lineage() {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py).unwrap();
+
+        let lineage: Vec<TaxonomyNode> = py
+            .eval(r#"tax.lineage("1224")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(
+            lineage.iter().map(|c| &c.id).collect::<Vec<_>>(),
+            vec!["1224", "2", "131567", "1"]
+        );
+    }
+
+    #[test]
+    fn test_parents() {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py).unwrap();
+
+        let lineage: Vec<TaxonomyNode> = py
+            .eval(r#"tax.parents("1224")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(
+            lineage.iter().map(|c| &c.id).collect::<Vec<_>>(),
+            vec!["2", "131567", "1"]
+        );
+    }
+
+    #[test]
+    fn test_lca() {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let ctx = setup_ctx(py).unwrap();
+
+        let lca: TaxonomyNode = py
+            .eval(r#"tax.lca("56812", "765909")"#, None, ctx)
+            .unwrap()
+            .extract()
+            .unwrap();
+        assert_eq!(lca.id, "1236");
     }
 
     #[test]
@@ -609,19 +753,12 @@ mod test {
         let py = gil.python();
         let ctx = setup_ctx(py)?;
 
-        let name: String = py.eval(r#"tax.name("1224")"#, None, ctx)?.extract()?;
-        assert_eq!(name, "Proteobacteria");
+        let root: TaxonomyNode = py.eval(r#"tax.root"#, None, ctx)?.extract()?;
+        assert_eq!(root.id, "1");
 
-        let rank: String = py.eval(r#"tax.rank("1224")"#, None, ctx)?.extract()?;
-        assert_eq!(rank, "phylum");
-        let rank: String = py.eval(r#"tax.rank("1")"#, None, ctx)?.extract()?;
-        assert_eq!(rank, "no rank");
-
-        let root: String = py.eval(r#"tax.root"#, None, ctx)?.extract()?;
-        assert_eq!(root, "1");
-
-        let rank: (String, String) = py.eval(r#"tax["1224"]"#, None, ctx)?.extract()?;
-        assert_eq!(rank, ("Proteobacteria".to_string(), "phylum".to_string()));
+        let node: TaxonomyNode = py.eval(r#"tax["1224"]"#, None, ctx)?.extract()?;
+        assert_eq!(node.rank, "phylum");
+        assert_eq!(node.name, "Proteobacteria");
         Ok(())
     }
 
@@ -677,35 +814,35 @@ mod test {
     }
 
     #[test]
-    fn test_change() -> PyResult<()> {
+    fn test_edit_node() -> PyResult<()> {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let ctx = setup_ctx(py).expect("setup context");
 
         assert!(py
-            .eval(r#"tax.change("bad id", name="New Name")"#, None, ctx)
+            .eval(r#"tax.edit_node("bad id", name="New Name")"#, None, ctx)
             .is_err());
-        py.eval(r#"tax.change("135622", name="New Name")"#, None, ctx)?;
+        py.eval(r#"tax.edit_node("135622", name="New Name")"#, None, ctx)?;
         let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(tax.t.name("135622").unwrap(), "New Name");
         drop(tax);
 
-        py.eval(r#"tax.change("135622", rank="genus")"#, None, ctx)?;
+        py.eval(r#"tax.edit_node("135622", rank="genus")"#, None, ctx)?;
         let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(tax.t.rank("135622").unwrap(), TaxRank::Genus);
         drop(tax);
 
         assert!(py
-            .eval(r#"tax.change("2", parent_id="135622")"#, None, ctx,)
+            .eval(r#"tax.edit_node("2", parent_id="135622")"#, None, ctx,)
             .is_err());
         assert!(py
-            .eval(r#"tax.change("1", parent_id="131567")"#, None, ctx,)
+            .eval(r#"tax.edit_node("1", parent_id="131567")"#, None, ctx,)
             .is_err());
         assert!(py
-            .eval(r#"tax.change("1", parent_dist=3.5)"#, None, ctx,)
+            .eval(r#"tax.edit_node("1", parent_distance=3.5)"#, None, ctx,)
             .is_err());
         py.eval(
-            r#"tax.change("135622", parent_id="2", parent_dist=3.5)"#,
+            r#"tax.edit_node("135622", parent_id="2", parent_distance=3.5)"#,
             None,
             ctx,
         )?;

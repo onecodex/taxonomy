@@ -42,6 +42,32 @@ jobs:
       - name: Run all tests
         run: cargo test --features=python_test
 
+      - name: Install python headers
+        run: sudo apt-get update && sudo apt-get install python3-dev python3-pip python3-venv
+
+      - name: Install maturin
+        run: |
+          python3 -m venv venv
+          . venv/bin/activate
+          pip3 install maturin
+          pip3 show maturin
+
+
+      - name: add library to venv
+        run: |
+          . venv/bin/activate
+          maturin develop --cargo-extra-args="--features=python"
+
+      - name: Run the python tests
+        run: |
+          . venv/bin/activate
+          python test_python.py
+
+      - name: compile taxonomy with python bindings
+        run: |
+          . venv/bin/activate
+          maturin build --cargo-extra-args="--features=python" --release --strip --manylinux=off
+
   fmt:
     runs-on: ubuntu-latest
     steps:

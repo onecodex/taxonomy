@@ -15,58 +15,151 @@ The library ships with a number of features:
  - [X] Easily extensible (in Rust) to support other formats and operations
 
 
-# Python Usage
+## Installation
 
-The Python taxonomy API can open and manipulate all of the formats from the Rust library:
-
-```python
-from taxonomy import Taxonomy
-
-tax = Taxonomy.from_newick('(A,(B,C)D)E;')
-assert tax.parent('A') == 'E'
-assert tax.parent('B') == 'D'
-```
-
-If you have the NCBI taxonomy locally ([found on their FTP](ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)), you can use that too:
-
-```python
-ncbi_tax = Taxonomy.from_ncbi('./nodes.dmp', './names.dmp')
-assert tax.name('562') == 'Escherichia coli'
-assert tax.rank('562') == 'species'
-```
-
-Note that Taxonomy IDs in NCBI format are integers, but they're converted to strings on import. We find working with "string taxonomy IDs" greatly simplifies interoperation between different taxonomy systems.
-
-
-# Installation
-
-## Rust
+### Rust
 This library can be added to an existing Cargo.toml file and installed straight from crates.io.
 
-## Python
+### Python
 You can install the Python bindings directly from PyPI (binaries are only built for select architextures) with:
 ```bash
 pip install taxonomy
 ```
 
+## Python Usage
 
-# Development
+The Python taxonomy API can open and manipulate all of the formats from the Rust library.
+Note that Taxonomy IDs in NCBI format are integers, but they're converted to strings on import. We find working with "string taxonomy IDs" greatly simplifies interoperation between different taxonomy systems.
 
-## Rust
+### Loading a taxonomy
+
+Taxonomy can be loaded from a variety of sources.
+
+1. `Taxonomy.from_newick(value: str)`: loads a Taxonomy from a Newick-encoded string.
+
+2. `Taxonomy.from_ncbi(nodes_path: str, names_path: str)`: loads a Taxonomy from a pair of NCBI dump files. The paths specified are
+to the individual files in the NCBI taxonomy directory (e.g. nodes.dmp and names.dmp).
+
+3. `Taxonomy.from_json(value: str, /, path: List[str])`: loads a Taxonomy from a JSON-encoded string. The format can either be
+of the tree or node_link_data types and will be automatically detected. If `path` is specified, the JSON will be traversed to that sub-object before being parsed as a taxonomy.
+
+4. `Taxonomy.from_phyloxml(value: &str)`: loads a Taxonomy from a PhyloXML-encoded string. **Experimental**
+
+### Exporting a taxonomy
+
+Assuming that the taxonomy has been instantiated as a variable named `tax`.
+
+1. `tax.to_newick()`: exports a Taxonomy as a Newick-encoded byte string.
+
+2. `tax.to_json(/, as_node_link_data: bool)`: exports a Taxonomy as a JSON-encoded byte string. By default, the JSON format 
+is a tree format unless the `as_node_link_data` parameter is set to True.
+
+### Using a taxonomy
+
+Assuming that the taxonomy has been instantiated as a variable named `tax`. Note that `TaxonomyNode` is a class with
+the following schema:
+
+```python
+class TaxonomyNode:
+    id: str
+    name: str
+    parent: Optional[str]
+    rank: str
+```
+
+Note that tax_id in parameters passed in functions described below are string but for example in the case of NCBI need
+to be essentially quoting integers: `562 -> "562"`. In that case, passing something that can't be converted to a number
+will raise an exception even if the documentation below does not mention it.
+
+#### `tax.root -> TaxonomyNode`
+Points to the root of the taxonomy
+
+#### `tax.get_parent(tax_id: str, /, at_rank: str) -> Optional[TaxonomyNode]`
+Return the immediate parent TaxonomyNode of the node id.
+
+If `at_rank` is provided, scan all the nodes in the node's lineage and return
+the parent id at that rank.
+
+Examples:
+
+```py
+parent, distance = tax.get_parent("612")
+parent, _ = tax.get_parent("612", at_rank="species")
+parent, distance = tax.get_parent("612")
+# Both variables will be `None` if we can't find the parent
+parent, distance = tax.get_parent("unknown")
+```
+
+#### `tax.get_parent_with_distance(tax_id: str, /, at_rank: str) -> (Optional[TaxonomyNode], Optional[float])`
+Same as `get_parent` but return the distance in addition, as a `(TaxonomyNode, float)` tuple.
+
+#### `tax.get(tax_id: str) -> Optional[TaxonomyNode]`
+
+Returns the node at that id. Returns `None` if not found.
+You can also use indexing to accomplish that: `tax["some_id"]` but this will raise an exception if the node
+is not found.
+
+#### `tax.find_by_name(name: str) -> Optional[TaxonomyNode]`
+
+Returns the node with that name. Returns `None` if not found.
+In NCBI, it only accounts for *scientific names* and not synonyms.
+
+#### `tax.children(tax_id: str) -> List[TaxonomyNode]`
+
+Returns all nodes below the given tax id.
+
+#### `tax.lineage(tax_id: str) -> List[TaxonomyNode]`
+
+Returns all nodes above the given tax id, including itself.
+
+#### `tax.parents(tax_id: str) -> List[TaxonomyNode]`
+
+Returns all nodes above the given tax id.
+
+#### `tax.lca(id1: str, id2: str) -> Optional[TaxonomyNode]`
+
+Returns the [lowest common ancestor](https://en.wikipedia.org/wiki/Lowest_common_ancestor) for the 2 given nodes.
+
+#### `tax.prune(keep: List[str], remove: List[str])-> Taxonomy`
+
+Return a copy of the taxonomy containing:
+
+- only the nodes in `keep` and their parents if provided
+- all of the nodes except those in remove and their children if provided
+
+#### `tax.remove(tax_id: str)`
+
+Remove the node from the tree, re-attaching parents as needed: only a single node is removed.
+
+#### `tax.add(parent_tax_id: str, new_tax_id: str)`
+
+Add a new node to the tree at the parent provided.
+
+#### `edit_node(tax_id: str, /, name: str, rank: str, parent_id: str, parent_dist: float)`
+
+Edit properties on a taxonomy node.
+
+### Exceptions
+Only one exception is raised intentionally by the library: `TaxonomyError`.
+If you get a `pyo3_runtime.PanicException` (or anything with `pyo3` in its name), this is a bug in the underlying Rust library, please open an issue.
+
+## Development
+
+### Rust
 There is a test suite runable with `cargo test`. To test the Python-bindings you need to use the additional `python_test` feature: `cargo test --features python_test`.
 
-## Python
+### Python
 To work on the Python library on a Mac OS X/Unix system (requires Python 3):
 ```bash
 # you need the nightly version of Rust installed
 curl https://sh.rustup.rs -sSf | sh
 rustup default nightly
 
-# finally, install the library
-maturin install --cargo-extra-args="--features=python"
+# finally, install the library in the local virtualenv
+maturin develop --cargo-extra-args="--features=python"
 ```
 
-### Building binary wheels and pushing to PyPI
+#### Building binary wheels and pushing to PyPI
 
 ```
 # The Mac build requires switching through a few different python versions
@@ -77,7 +170,7 @@ docker run --rm -v $(pwd):/io konstin2/maturin:master build --cargo-extra-args="
 twine upload target/wheels/*
 ```
 
-# Other Taxonomy Libraries
+## Other Taxonomy Libraries
 
 There are taxonomic toolkits for other programming languages that offer different features and provided some inspiration for this library:
 
