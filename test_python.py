@@ -42,7 +42,11 @@ class NewickTestCase(unittest.TestCase):
         self.assertIsNone(node)
 
     def test_parent(self):
-        parent, distance = self.tax.get_parent("D")
+        parent = self.tax.get_parent("D")
+        self.assertEqual(parent.id, "E")
+
+    def test_parent_with_distance(self):
+        parent, distance = self.tax.get_parent_with_distance("D")
         self.assertEqual(parent.id, "E")
         # Float precision issue
         # 0.4 becomes 0.4000000059604645
@@ -98,7 +102,7 @@ class NewickTestCase(unittest.TestCase):
     def test_edit_node(self):
         tax = self._create_tax()
         tax.edit_node("D", parent_distance=3)
-        node, distance = tax.get_parent("D")
+        node, distance = tax.get_parent_with_distance("D")
         self.assertEqual(distance, 3)
 
 
@@ -139,7 +143,11 @@ class NCBITestCase(unittest.TestCase):
         self.assertEqual(node.parent, "561")
 
     def test_parent(self):
-        parent, distance = self.tax.get_parent("562")
+        parent = self.tax.get_parent("562")
+        self.assertEqual(parent.id, "561")
+
+    def test_parent_with_distance(self):
+        parent, distance = self.tax.get_parent_with_distance("562")
         self.assertEqual(parent.id, "561")
         # Float precision issue
         # 0.4 becomes 0.4000000059604645
@@ -194,7 +202,7 @@ class NCBITestCase(unittest.TestCase):
     def test_edit_node(self):
         tax = self._create_tax()
         tax.edit_node("562", parent_distance=3)
-        node, distance = tax.get_parent("562")
+        node, distance = tax.get_parent_with_distance("562")
         self.assertEqual(distance, 3)
 
 

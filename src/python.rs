@@ -213,15 +213,14 @@ impl Taxonomy {
         }
     }
 
-    /// get_parent(self, tax_id: str, /, at_rank: str)
+    /// get_parent_with_distance(self, tax_id: str, /, at_rank: str)
     /// --
     ///
-    /// Return the immediate parent taxonomy node of the node id provided.
+    /// Return the immediate parent taxonomy node of the node id provided and the distance to it
     ///
     /// If `at_rank` is provided, scan all the nodes in the node's lineage and return
     /// the parent id at that rank.
-    #[args(include_dist = false)]
-    fn get_parent(
+    fn get_parent_with_distance(
         &self,
         tax_id: &str,
         at_rank: Option<&str>,
@@ -244,6 +243,17 @@ impl Taxonomy {
         } else {
             Ok((None, None))
         }
+    }
+    /// get_parent(self, tax_id: str, /, at_rank: str)
+    /// --
+    ///
+    /// Return the immediate parent taxonomy node of the node id provided.
+    ///
+    /// If `at_rank` is provided, scan all the nodes in the node's lineage and return
+    /// the parent id at that rank.
+    fn get_parent(&self, tax_id: &str, at_rank: Option<&str>) -> PyResult<Option<TaxonomyNode>> {
+        let (node, _) = self.get_parent_with_distance(tax_id, at_rank)?;
+        Ok(node)
     }
 
     /// children(self, tax_id: str)
@@ -638,35 +648,33 @@ mod test {
         let py = gil.python();
         let ctx = setup_ctx(py).unwrap();
 
-        let parent: (TaxonomyNode, f32) = py
+        let parent: TaxonomyNode = py
             .eval(r#"tax.get_parent("53452")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
-        assert_eq!(parent.0.id, "1046");
+        assert_eq!(parent.id, "1046");
 
-        let parent: (TaxonomyNode, f32) = py
+        let parent: TaxonomyNode = py
             .eval(r#"tax.get_parent("53452", at_rank="phylum")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
-        assert_eq!(parent.0.id, "1224");
+        assert_eq!(parent.id, "1224");
 
-        let parent: (Option<TaxonomyNode>, Option<f32>) = py
+        let parent: Option<TaxonomyNode> = py
             .eval(r#"tax.get_parent("bad id")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
-        assert!(parent.0.is_none());
-        assert!(parent.1.is_none());
+        assert!(parent.is_none());
 
-        let parent: (Option<TaxonomyNode>, Option<f32>) = py
+        let parent: Option<TaxonomyNode> = py
             .eval(r#"tax.get_parent("bad id", at_rank="species")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
-        assert!(parent.0.is_none());
-        assert!(parent.1.is_none());
+        assert!(parent.is_none());
 
         // A bad rank does raise
         assert!(py

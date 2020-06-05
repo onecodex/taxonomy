@@ -74,8 +74,8 @@ will raise an exception even if the documentation below does not mention it.
 #### `tax.root -> TaxonomyNode`
 Points to the root of the taxonomy
 
-#### `tax.get_parent(tax_id: str, /, at_rank: str) -> (Optional[TaxonomyNode], Optional[float])`
-Return the immediate parent TaxonomyNode of the node id provided as well as the distance to it as a `(TaxonomyNode, float)` tuple.
+#### `tax.get_parent(tax_id: str, /, at_rank: str) -> Optional[TaxonomyNode]`
+Return the immediate parent TaxonomyNode of the node id.
 
 If `at_rank` is provided, scan all the nodes in the node's lineage and return
 the parent id at that rank.
@@ -89,6 +89,9 @@ parent, distance = tax.get_parent("612")
 # Both variables will be `None` if we can't find the parent
 parent, distance = tax.get_parent("unknown")
 ```
+
+#### `tax.get_parent_with_distance(tax_id: str, /, at_rank: str) -> (Optional[TaxonomyNode], Optional[float])`
+Same as `get_parent` but return the distance in addition, as a `(TaxonomyNode, float)` tuple.
 
 #### `tax.get(tax_id: str) -> Optional[TaxonomyNode]`
 
