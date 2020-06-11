@@ -83,11 +83,11 @@ the parent id at that rank.
 Examples:
 
 ```py
-parent, distance = tax.get_parent("612")
-parent, _ = tax.get_parent("612", at_rank="species")
-parent, distance = tax.get_parent("612")
+parent = tax.get_parent("612")
+parent = tax.get_parent("612", at_rank="species")
+parent = tax.get_parent("612")
 # Both variables will be `None` if we can't find the parent
-parent, distance = tax.get_parent("unknown")
+parent = tax.get_parent("unknown")
 ```
 
 #### `tax.get_parent_with_distance(tax_id: str, /, at_rank: str) -> (Optional[TaxonomyNode], Optional[float])`
