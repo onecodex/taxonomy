@@ -42,7 +42,10 @@ pub struct TaxonomyNode {
 #[pyproto]
 impl PyObjectProtocol for TaxonomyNode {
     fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("<TaxonomyNode (id={} rank=\"{}\" name=\"{}\"))>", self.id, self.rank, self.name))
+        Ok(format!(
+            "<TaxonomyNode (id={} rank=\"{}\" name=\"{}\"))>",
+            self.id, self.rank, self.name
+        ))
     }
 }
 
