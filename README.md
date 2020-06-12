@@ -22,6 +22,7 @@ This library can be added to an existing Cargo.toml file and installed straight 
 
 ### Python
 You can install the Python bindings directly from PyPI (binaries are only built for select architextures) with:
+
 ```bash
 pip install taxonomy
 ```
@@ -157,6 +158,9 @@ rustup default nightly
 
 # finally, install the library in the local virtualenv
 maturin develop --cargo-extra-args="--features=python"
+
+# or using pip
+pip install .
 ```
 
 #### Building binary wheels and pushing to PyPI
