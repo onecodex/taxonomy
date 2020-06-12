@@ -93,7 +93,7 @@ parent = tax.get_parent("unknown")
 #### `tax.get_parent_with_distance(tax_id: str, /, at_rank: str) -> (Optional[TaxonomyNode], Optional[float])`
 Same as `get_parent` but return the distance in addition, as a `(TaxonomyNode, float)` tuple.
 
-#### `tax.get(tax_id: str) -> Optional[TaxonomyNode]`
+#### `tax.get_node(tax_id: str) -> Optional[TaxonomyNode]`
 
 Returns the node at that id. Returns `None` if not found.
 You can also use indexing to accomplish that: `tax["some_id"]` but this will raise an exception if the node
@@ -104,15 +104,15 @@ is not found.
 Returns the node with that name. Returns `None` if not found.
 In NCBI, it only accounts for *scientific names* and not synonyms.
 
-#### `tax.children(tax_id: str) -> List[TaxonomyNode]`
+#### `tax.get_children(tax_id: str) -> List[TaxonomyNode]`
 
 Returns all nodes below the given tax id.
 
-#### `tax.lineage(tax_id: str) -> List[TaxonomyNode]`
+#### `tax.get_lineage(tax_id: str) -> List[TaxonomyNode]`
 
 Returns all nodes above the given tax id, including itself.
 
-#### `tax.parents(tax_id: str) -> List[TaxonomyNode]`
+#### `tax.get_parents(tax_id: str) -> List[TaxonomyNode]`
 
 Returns all nodes above the given tax id.
 
@@ -127,11 +127,11 @@ Return a copy of the taxonomy containing:
 - only the nodes in `keep` and their parents if provided
 - all of the nodes except those in remove and their children if provided
 
-#### `tax.remove(tax_id: str)`
+#### `tax.remove_node(tax_id: str)`
 
 Remove the node from the tree, re-attaching parents as needed: only a single node is removed.
 
-#### `tax.add(parent_tax_id: str, new_tax_id: str)`
+#### `tax.add_node(parent_tax_id: str, new_tax_id: str)`
 
 Add a new node to the tree at the parent provided.
 

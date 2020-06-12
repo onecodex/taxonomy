@@ -193,11 +193,11 @@ impl Taxonomy {
         Ok(PyBytes::new(py, &s).into())
     }
 
-    /// get(self, tax_id: str) -> Optional[TaxonomyNode]
+    /// get_node(self, tax_id: str) -> Optional[TaxonomyNode]
     /// --
     ///
     /// Find a node by its id. Returns `None` if not found
-    fn get(&self, tax_id: &str) -> Option<TaxonomyNode> {
+    fn get_node(&self, tax_id: &str) -> Option<TaxonomyNode> {
         self.as_node(tax_id).ok()
     }
 
@@ -256,15 +256,15 @@ impl Taxonomy {
         Ok(node)
     }
 
-    /// children(self, tax_id: str)
+    /// get_children(self, tax_id: str)
     /// --
     ///
     /// Return a list of child taxonomy nodes from the node id provided.
-    fn children(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+    fn get_children(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
         let children: Vec<&str> = py_try!(self.t.children(tax_id));
         let mut res = Vec::with_capacity(children.len());
         for key in children {
-            let child = self.get(key);
+            let child = self.get_node(key);
             if let Some(c) = child {
                 res.push(c);
             } else {
@@ -278,16 +278,16 @@ impl Taxonomy {
         Ok(res)
     }
 
-    /// lineage(self, tax_id: str)
+    /// get_lineage(self, tax_id: str)
     /// --
     ///
     /// Return a list of all the parent taxonomy nodes of the node id provided
     /// (including that node itself).
-    fn lineage(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+    fn get_lineage(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
         let lineage: Vec<&str> = py_try!(self.t.lineage(tax_id));
         let mut res = Vec::with_capacity(lineage.len());
         for key in lineage {
-            let ancestor = self.get(key);
+            let ancestor = self.get_node(key);
             if let Some(a) = ancestor {
                 res.push(a);
             } else {
@@ -301,23 +301,23 @@ impl Taxonomy {
         Ok(res)
     }
 
-    /// parents(self, tax_id: str)
+    /// get_parents(self, tax_id: str)
     /// --
     ///
     /// Return a list of all the parent taxonomy nodes of the node id provided.
-    fn parents(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
-        let mut lineage = self.lineage(tax_id)?;
+    fn get_parents(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+        let mut lineage = self.get_lineage(tax_id)?;
         lineage.drain(..1);
         Ok(lineage)
     }
 
-    /// lca(self, id1: str, id2: str)
+    /// get_lca(self, id1: str, id2: str)
     /// --
     ///
     /// Return the lowest common ancestor of two taxonomy nodes.
-    fn lca(&self, id1: &str, id2: &str) -> PyResult<Option<TaxonomyNode>> {
+    fn get_lca(&self, id1: &str, id2: &str) -> PyResult<Option<TaxonomyNode>> {
         let lca_id = py_try!(self.t.lca(id1, id2));
-        Ok(self.get(lca_id))
+        Ok(self.get_node(lca_id))
     }
 
     /// prune(self, keep: List[str], remove: List[str])
@@ -337,21 +337,21 @@ impl Taxonomy {
         Ok(Taxonomy { t: tax })
     }
 
-    /// remove(self, tax_id: str)
+    /// remove_node(self, tax_id: str)
     /// --
     ///
     /// Remove the node from the tree.
-    fn remove(&mut self, tax_id: &str) -> PyResult<()> {
+    fn remove_node(&mut self, tax_id: &str) -> PyResult<()> {
         let int_id = self.get_int_id(tax_id)?;
         py_try!(self.t.remove(int_id));
         Ok(())
     }
 
-    /// add(self, parent_id: str, tax_id: str)
+    /// add_node(self, parent_id: str, tax_id: str)
     /// --
     ///
     /// Add a new node to the tree at the parent provided.
-    fn add(&mut self, parent_id: &str, tax_id: &str) -> PyResult<()> {
+    fn add_node(&mut self, parent_id: &str, tax_id: &str) -> PyResult<()> {
         let int_id = self.get_int_id(parent_id)?;
         py_try!(self.t.add(int_id, tax_id));
         Ok(())
@@ -603,7 +603,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let node: TaxonomyNode = py
-            .eval(r#"tax.get("53452")"#, None, ctx)
+            .eval(r#"tax.get_node("53452")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -612,7 +612,7 @@ mod test {
         assert_eq!(node.name, "Lamprocystis");
 
         let node: Option<TaxonomyNode> = py
-            .eval(r#"tax.get("unknown")"#, None, ctx)
+            .eval(r#"tax.get_node("unknown")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -689,7 +689,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let children: Vec<TaxonomyNode> = py
-            .eval(r#"tax.children("53452")"#, None, ctx)
+            .eval(r#"tax.get_children("53452")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -706,7 +706,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let lineage: Vec<TaxonomyNode> = py
-            .eval(r#"tax.lineage("1224")"#, None, ctx)
+            .eval(r#"tax.get_lineage("1224")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -723,7 +723,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let lineage: Vec<TaxonomyNode> = py
-            .eval(r#"tax.parents("1224")"#, None, ctx)
+            .eval(r#"tax.get_parents("1224")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -740,7 +740,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let lca: TaxonomyNode = py
-            .eval(r#"tax.lca("56812", "765909")"#, None, ctx)
+            .eval(r#"tax.get_lca("56812", "765909")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -785,15 +785,15 @@ mod test {
         drop(tax);
 
         assert!(py
-            .eval(r#"tax.add("bad id", "new id")"#, None, ctx)
+            .eval(r#"tax.add_node("bad id", "new id")"#, None, ctx)
             .is_err());
-        py.eval(r#"tax.add("1236", "91347")"#, None, ctx)?;
+        py.eval(r#"tax.add_node("1236", "91347")"#, None, ctx)?;
         let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), n_tax_items + 1);
         drop(tax);
 
-        assert!(py.eval(r#"tax.remove("bad id")"#, None, ctx).is_err());
-        py.eval(r#"tax.remove("135622")"#, None, ctx)?;
+        assert!(py.eval(r#"tax.remove_node("bad id")"#, None, ctx).is_err());
+        py.eval(r#"tax.remove_node("135622")"#, None, ctx)?;
         let tax: PyRef<Taxonomy> = ctx.unwrap().get_item("tax").unwrap().extract()?;
         assert_eq!(TaxTrait::<&str, _>::len(&tax.t), n_tax_items);
         drop(tax);
