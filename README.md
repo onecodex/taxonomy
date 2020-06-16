@@ -21,7 +21,7 @@ The library ships with a number of features:
 This library can be added to an existing Cargo.toml file and installed straight from crates.io.
 
 ### Python
-You can install the Python bindings directly from PyPI (binaries are only built for select architextures) with:
+You can install the Python bindings directly from PyPI (binaries are only built for select architectures) with:
 
 ```bash
 pip install taxonomy
