@@ -30,7 +30,7 @@ pip install taxonomy
 ## Python Usage
 
 The Python taxonomy API can open and manipulate all of the formats from the Rust library.
-Note that Taxonomy IDs in NCBI format are integers, but they're converted to strings on import. We find working with "string taxonomy IDs" greatly simplifies interoperation between different taxonomy systems.
+Note that Taxonomy IDs in NCBI format are integers, but they're converted to strings on import. We find working with "string taxonomy IDs" greatly simplifies inter-operation between different taxonomy systems.
 
 ### Loading a taxonomy
 
