@@ -17,15 +17,15 @@ class NewickTestCase(unittest.TestCase):
         self.assertIsNone(root.parent)
 
     def test_find_node_by_id(self):
-        node = self.tax.get("A")
+        node = self.tax.get_node("A")
         self.assertEqual(node.id, "A")
         self.assertEqual(node.parent, "F")
 
-        node = self.tax.get("D")
+        node = self.tax.get_node("D")
         self.assertEqual(node.id, "D")
         self.assertEqual(node.parent, "E")
 
-        node = self.tax.get("unknown")
+        node = self.tax.get_node("unknown")
         self.assertIsNone(node)
 
     def test_index(self):
@@ -53,49 +53,49 @@ class NewickTestCase(unittest.TestCase):
         self.assertAlmostEqual(distance, 0.4)
 
     def test_children(self):
-        children = self.tax.children("E")
+        children = self.tax.get_children("E")
         self.assertEqual(len(children), 2)
         self.assertEqual(children[0].id, "C")
         self.assertEqual(children[1].id, "D")
 
     def test_lineage(self):
-        lineage = self.tax.lineage("D")
+        lineage = self.tax.get_lineage("D")
         self.assertEqual(len(lineage), 3)
         self.assertEqual(lineage[0].id, "D")
         self.assertEqual(lineage[1].id, "E")
         self.assertEqual(lineage[2].id, "F")
 
     def test_parents(self):
-        lineage = self.tax.parents("D")
+        lineage = self.tax.get_parents("D")
         self.assertEqual(len(lineage), 2)
         self.assertEqual(lineage[0].id, "E")
         self.assertEqual(lineage[1].id, "F")
 
     def test_lca(self):
-        lca = self.tax.lca("A", "D")
+        lca = self.tax.get_lca("A", "D")
         self.assertEqual(lca.id, "F")
 
     def test_prune(self):
         new_tax = self.tax.prune(remove=["E"])
-        self.assertIsNone(new_tax.get("D"))
-        self.assertIsNone(new_tax.get("E"))
+        self.assertIsNone(new_tax.get_node("D"))
+        self.assertIsNone(new_tax.get_node("E"))
         # We removed a leaf
         self.assertEqual(len(new_tax), 3)
 
         new_tax = self.tax.prune(keep=["E", "D"])
         self.assertEqual(len(new_tax), 3)
-        self.assertIsNotNone(new_tax.get("F"))
+        self.assertIsNotNone(new_tax.get_node("F"))
 
     def test_remove(self):
         tax = self._create_tax()
-        tax.remove("E")
-        self.assertIsNotNone(tax.get("D"))
-        self.assertIsNone(tax.get("E"))
+        tax.remove_node("E")
+        self.assertIsNotNone(tax.get_node("D"))
+        self.assertIsNone(tax.get_node("E"))
         self.assertEqual(len(tax), 5)
 
     def test_add(self):
         tax = self._create_tax()
-        tax.add("D", "G")
+        tax.add_node("D", "G")
         node = tax["G"]
         self.assertEqual(node.parent, "D")
 
@@ -119,12 +119,12 @@ class NCBITestCase(unittest.TestCase):
         self.assertIsNone(root.parent)
 
     def test_find_node_by_id(self):
-        node = self.tax.get("1236")
+        node = self.tax.get_node("1236")
         self.assertEqual(node.id, "1236")
         self.assertEqual(node.name, "Gammaproteobacteria")
         self.assertEqual(node.parent, "1224")
 
-        node = self.tax.get("unknown")
+        node = self.tax.get_node("unknown")
         self.assertIsNone(node)
 
     def test_index(self):
@@ -154,48 +154,48 @@ class NCBITestCase(unittest.TestCase):
         self.assertAlmostEqual(distance, 1.0)
 
     def test_children(self):
-        children = self.tax.children("561")
+        children = self.tax.get_children("561")
         self.assertEqual(len(children), 1)
         self.assertEqual(children[0].id, "562")
 
     def test_lineage(self):
-        lineage = self.tax.lineage("562")
+        lineage = self.tax.get_lineage("562")
         self.assertEqual(len(lineage), 9)
         self.assertEqual(lineage[0].id, "562")
         self.assertEqual(lineage[1].id, "561")
         self.assertEqual(lineage[-1].id, "1")
 
     def test_parents(self):
-        lineage = self.tax.parents("562")
+        lineage = self.tax.get_parents("562")
         self.assertEqual(len(lineage), 8)
         self.assertEqual(lineage[0].id, "561")
         self.assertEqual(lineage[-1].id, "1")
 
     def test_lca(self):
-        lca = self.tax.lca("562", "91347")
+        lca = self.tax.get_lca("562", "91347")
         self.assertEqual(lca.id, "91347")
 
     def test_prune(self):
         new_tax = self.tax.prune(remove=["561"])
-        self.assertIsNone(new_tax.get("561"))
-        self.assertIsNone(new_tax.get("562"))
+        self.assertIsNone(new_tax.get_node("561"))
+        self.assertIsNone(new_tax.get_node("562"))
         self.assertEqual(len(new_tax), 7)
 
         new_tax = self.tax.prune(keep=["561"])
         self.assertEqual(len(new_tax), 8)
-        self.assertIsNotNone(new_tax.get("561"))
+        self.assertIsNotNone(new_tax.get_node("561"))
 
     @unittest.skip("tax.remove doesn't work on truncated taxonomies?")
     def test_remove(self):
         tax = self._create_tax()
-        tax.remove("561")
-        self.assertIsNotNone(tax.get("562"))
-        self.assertIsNone(tax.get("561"))
+        tax.remove_node("561")
+        self.assertIsNotNone(tax.get_node("562"))
+        self.assertIsNone(tax.get_node("561"))
         self.assertEqual(len(tax), 8)
 
     def test_add(self):
         tax = self._create_tax()
-        tax.add("561", "563")
+        tax.add_node("561", "563")
         node = tax["563"]
         self.assertEqual(node.parent, "561")
 
