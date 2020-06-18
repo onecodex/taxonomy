@@ -196,11 +196,11 @@ impl Taxonomy {
         Ok(PyBytes::new(py, &s).into())
     }
 
-    /// get_node(self, tax_id: str) -> Optional[TaxonomyNode]
+    /// node(self, tax_id: str) -> Optional[TaxonomyNode]
     /// --
     ///
     /// Find a node by its id. Returns `None` if not found
-    fn get_node(&self, tax_id: &str) -> Option<TaxonomyNode> {
+    fn node(&self, tax_id: &str) -> Option<TaxonomyNode> {
         self.as_node(tax_id).ok()
     }
 
@@ -216,14 +216,14 @@ impl Taxonomy {
         }
     }
 
-    /// get_parent_with_distance(self, tax_id: str, /, at_rank: str)
+    /// parent_with_distance(self, tax_id: str, /, at_rank: str)
     /// --
     ///
     /// Return the immediate parent taxonomy node of the node id provided and the distance to it
     ///
     /// If `at_rank` is provided, scan all the nodes in the node's lineage and return
     /// the parent id at that rank.
-    fn get_parent_with_distance(
+    fn parent_with_distance(
         &self,
         tax_id: &str,
         at_rank: Option<&str>,
@@ -247,27 +247,27 @@ impl Taxonomy {
             Ok((None, None))
         }
     }
-    /// get_parent(self, tax_id: str, /, at_rank: str)
+    /// parent(self, tax_id: str, /, at_rank: str)
     /// --
     ///
     /// Return the immediate parent taxonomy node of the node id provided.
     ///
     /// If `at_rank` is provided, scan all the nodes in the node's lineage and return
     /// the parent id at that rank.
-    fn get_parent(&self, tax_id: &str, at_rank: Option<&str>) -> PyResult<Option<TaxonomyNode>> {
-        let (node, _) = self.get_parent_with_distance(tax_id, at_rank)?;
+    fn parent(&self, tax_id: &str, at_rank: Option<&str>) -> PyResult<Option<TaxonomyNode>> {
+        let (node, _) = self.parent_with_distance(tax_id, at_rank)?;
         Ok(node)
     }
 
-    /// get_children(self, tax_id: str)
+    /// children(self, tax_id: str)
     /// --
     ///
     /// Return a list of child taxonomy nodes from the node id provided.
-    fn get_children(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+    fn children(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
         let children: Vec<&str> = py_try!(self.t.children(tax_id));
         let mut res = Vec::with_capacity(children.len());
         for key in children {
-            let child = self.get_node(key);
+            let child = self.node(key);
             if let Some(c) = child {
                 res.push(c);
             } else {
@@ -281,16 +281,16 @@ impl Taxonomy {
         Ok(res)
     }
 
-    /// get_lineage(self, tax_id: str)
+    /// lineage(self, tax_id: str)
     /// --
     ///
     /// Return a list of all the parent taxonomy nodes of the node id provided
     /// (including that node itself).
-    fn get_lineage(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+    fn lineage(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
         let lineage: Vec<&str> = py_try!(self.t.lineage(tax_id));
         let mut res = Vec::with_capacity(lineage.len());
         for key in lineage {
-            let ancestor = self.get_node(key);
+            let ancestor = self.node(key);
             if let Some(a) = ancestor {
                 res.push(a);
             } else {
@@ -304,23 +304,23 @@ impl Taxonomy {
         Ok(res)
     }
 
-    /// get_parents(self, tax_id: str)
+    /// parents(self, tax_id: str)
     /// --
     ///
     /// Return a list of all the parent taxonomy nodes of the node id provided.
-    fn get_parents(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
-        let mut lineage = self.get_lineage(tax_id)?;
+    fn parents(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+        let mut lineage = self.lineage(tax_id)?;
         lineage.drain(..1);
         Ok(lineage)
     }
 
-    /// get_lca(self, id1: str, id2: str)
+    /// lca(self, id1: str, id2: str)
     /// --
     ///
     /// Return the lowest common ancestor of two taxonomy nodes.
-    fn get_lca(&self, id1: &str, id2: &str) -> PyResult<Option<TaxonomyNode>> {
+    fn lca(&self, id1: &str, id2: &str) -> PyResult<Option<TaxonomyNode>> {
         let lca_id = py_try!(self.t.lca(id1, id2));
-        Ok(self.get_node(lca_id))
+        Ok(self.node(lca_id))
     }
 
     /// prune(self, keep: List[str], remove: List[str])
@@ -409,7 +409,7 @@ impl Taxonomy {
     }
 
     #[getter]
-    fn get_root(&self) -> TaxonomyNode {
+    fn root(&self) -> TaxonomyNode {
         let key: &str = self.t.root();
         self.as_node(key).unwrap()
     }
@@ -606,7 +606,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let node: TaxonomyNode = py
-            .eval(r#"tax.get_node("53452")"#, None, ctx)
+            .eval(r#"tax.node("53452")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -615,7 +615,7 @@ mod test {
         assert_eq!(node.name, "Lamprocystis");
 
         let node: Option<TaxonomyNode> = py
-            .eval(r#"tax.get_node("unknown")"#, None, ctx)
+            .eval(r#"tax.node("unknown")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -646,34 +646,34 @@ mod test {
     }
 
     #[test]
-    fn test_get_parent() {
+    fn test_parent() {
         let gil = Python::acquire_gil();
         let py = gil.python();
         let ctx = setup_ctx(py).unwrap();
 
         let parent: TaxonomyNode = py
-            .eval(r#"tax.get_parent("53452")"#, None, ctx)
+            .eval(r#"tax.parent("53452")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
         assert_eq!(parent.id, "1046");
 
         let parent: TaxonomyNode = py
-            .eval(r#"tax.get_parent("53452", at_rank="phylum")"#, None, ctx)
+            .eval(r#"tax.parent("53452", at_rank="phylum")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
         assert_eq!(parent.id, "1224");
 
         let parent: Option<TaxonomyNode> = py
-            .eval(r#"tax.get_parent("bad id")"#, None, ctx)
+            .eval(r#"tax.parent("bad id")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
         assert!(parent.is_none());
 
         let parent: Option<TaxonomyNode> = py
-            .eval(r#"tax.get_parent("bad id", at_rank="species")"#, None, ctx)
+            .eval(r#"tax.parent("bad id", at_rank="species")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -681,7 +681,7 @@ mod test {
 
         // A bad rank does raise
         assert!(py
-            .eval(r#"tax.get_parent("53452", at_rank="bad rank")"#, None, ctx)
+            .eval(r#"tax.parent("53452", at_rank="bad rank")"#, None, ctx)
             .is_err());
     }
 
@@ -692,7 +692,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let children: Vec<TaxonomyNode> = py
-            .eval(r#"tax.get_children("53452")"#, None, ctx)
+            .eval(r#"tax.children("53452")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -709,7 +709,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let lineage: Vec<TaxonomyNode> = py
-            .eval(r#"tax.get_lineage("1224")"#, None, ctx)
+            .eval(r#"tax.lineage("1224")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -726,7 +726,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let lineage: Vec<TaxonomyNode> = py
-            .eval(r#"tax.get_parents("1224")"#, None, ctx)
+            .eval(r#"tax.parents("1224")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();
@@ -743,7 +743,7 @@ mod test {
         let ctx = setup_ctx(py).unwrap();
 
         let lca: TaxonomyNode = py
-            .eval(r#"tax.get_lca("56812", "765909")"#, None, ctx)
+            .eval(r#"tax.lca("56812", "765909")"#, None, ctx)
             .unwrap()
             .extract()
             .unwrap();

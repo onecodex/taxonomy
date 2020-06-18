@@ -75,7 +75,7 @@ will raise an exception even if the documentation below does not mention it.
 #### `tax.root -> TaxonomyNode`
 Points to the root of the taxonomy
 
-#### `tax.get_parent(tax_id: str, /, at_rank: str) -> Optional[TaxonomyNode]`
+#### `tax.parent(tax_id: str, /, at_rank: str) -> Optional[TaxonomyNode]`
 Return the immediate parent TaxonomyNode of the node id.
 
 If `at_rank` is provided, scan all the nodes in the node's lineage and return
@@ -84,17 +84,17 @@ the parent id at that rank.
 Examples:
 
 ```py
-parent = tax.get_parent("612")
-parent = tax.get_parent("612", at_rank="species")
-parent = tax.get_parent("612")
+parent = tax.parent("612")
+parent = tax.parent("612", at_rank="species")
+parent = tax.parent("612")
 # Both variables will be `None` if we can't find the parent
-parent = tax.get_parent("unknown")
+parent = tax.parent("unknown")
 ```
 
-#### `tax.get_parent_with_distance(tax_id: str, /, at_rank: str) -> (Optional[TaxonomyNode], Optional[float])`
-Same as `get_parent` but return the distance in addition, as a `(TaxonomyNode, float)` tuple.
+#### `tax.parent_with_distance(tax_id: str, /, at_rank: str) -> (Optional[TaxonomyNode], Optional[float])`
+Same as `parent` but return the distance in addition, as a `(TaxonomyNode, float)` tuple.
 
-#### `tax.get_node(tax_id: str) -> Optional[TaxonomyNode]`
+#### `tax.node(tax_id: str) -> Optional[TaxonomyNode]`
 
 Returns the node at that id. Returns `None` if not found.
 You can also use indexing to accomplish that: `tax["some_id"]` but this will raise an exception if the node
@@ -105,15 +105,15 @@ is not found.
 Returns the node with that name. Returns `None` if not found.
 In NCBI, it only accounts for *scientific names* and not synonyms.
 
-#### `tax.get_children(tax_id: str) -> List[TaxonomyNode]`
+#### `tax.children(tax_id: str) -> List[TaxonomyNode]`
 
 Returns all nodes below the given tax id.
 
-#### `tax.get_lineage(tax_id: str) -> List[TaxonomyNode]`
+#### `tax.lineage(tax_id: str) -> List[TaxonomyNode]`
 
 Returns all nodes above the given tax id, including itself.
 
-#### `tax.get_parents(tax_id: str) -> List[TaxonomyNode]`
+#### `tax.parents(tax_id: str) -> List[TaxonomyNode]`
 
 Returns all nodes above the given tax id.
 
