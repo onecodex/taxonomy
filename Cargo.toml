@@ -1,6 +1,6 @@
 [package]
 name = "taxonomy"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Roderick Bovee & One Codex <roderick@onecodex.com>"]
 description = "Routines for loading, saving, and manipulating taxonomic trees"
 keywords = ["taxonomy", "bioinformatics"]
@@ -12,8 +12,8 @@ edition = "2018"
 
 [dependencies]
 memchr = "2.2.1"
-pyo3 = { version = "0.8.5", optional = true }
-quick-xml = "0.17.2"
+pyo3 = { version = "0.10", optional = true }
+quick-xml = "0.18"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"
 

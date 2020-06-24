@@ -45,6 +45,7 @@ impl GeneralTaxonomy {
         if self.children_lookup.len() != self.tax_ids.len() {
             self.children_lookup.resize(self.tax_ids.len(), Vec::new());
         }
+
         for (ix, parent_ix) in self.parent_ids.iter().enumerate() {
             if ix != 0 {
                 self.children_lookup[*parent_ix].push(ix);
@@ -179,6 +180,19 @@ impl GeneralTaxonomy {
         )
     }
 
+    /// Retrieves the external ID given its name
+    ///
+    /// Always errors on Newick since it doesn't contain names.
+    pub fn find_by_name(&self, name: &str) -> Result<&str> {
+        if let Some(pos) = self.names.iter().position(|s| s == name) {
+            Ok(&self.tax_ids[pos])
+        } else {
+            Err(TaxonomyError::NoSuchName {
+                name: name.to_string(),
+            })
+        }
+    }
+
     /// Remove a single node from the taxonomy.
     ///
     /// Unlike pruning the children of the node are kept, but are rejoined
@@ -212,7 +226,9 @@ impl GeneralTaxonomy {
         // everything after `tax_id` in parents needs to get decremented by 1
         // because we've changed the actual array size
         for parent in self.parent_ids.iter_mut().skip(tax_id + 1) {
-            *parent -= 1;
+            if *parent > 0 {
+                *parent -= 1;
+            }
         }
 
         // we could try to update the lookups, but all of the values in
@@ -259,7 +275,7 @@ impl Default for GeneralTaxonomy {
 /// This is the implementation for "internal" tax ID lookup; these IDs are
 /// arbitrary (they're positions of the tax nodes in the internal array) and
 /// not linked at all to the "external" (e.g. NCBI) IDs. Using these IDs
-/// directly can lead to a decent speed up without having to build indicies.
+/// directly can lead to a decent speed up without having to build indices.
 impl<'s> Taxonomy<'s, IntTaxId, f32> for GeneralTaxonomy {
     fn root(&self) -> IntTaxId {
         0
@@ -331,6 +347,7 @@ impl<'s> Taxonomy<'s, &'s str, f32> for GeneralTaxonomy {
         if usize_tax_id == 0 {
             return Ok(None);
         }
+
         Ok(Some((
             self.from_internal_id(self.parent_ids[usize_tax_id])?,
             self.parent_dists[usize_tax_id],
@@ -414,6 +431,20 @@ pub(crate) mod test {
         assert_eq!(Taxonomy::<&str, _>::root(&def), "1");
 
         Ok(())
+    }
+
+    #[test]
+    fn test_find_by_name() {
+        let t = GeneralTaxonomy::from_arrays(
+            vec!["1".to_string(), "2".to_string()],
+            vec![0, 0],
+            Some(vec!["A".to_string(), "B".to_string()]),
+            Some(vec![TaxRank::Unspecified, TaxRank::Unspecified]),
+            Some(vec![1., 1.]),
+        )
+        .unwrap();
+
+        assert_eq!(t.find_by_name("B").unwrap(), "2");
     }
 
     #[test]
