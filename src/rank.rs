@@ -91,6 +91,15 @@ pub enum TaxRank {
     Breed,
     Strain,
     Individual,
+    Clade,
+    SeroGroup,
+    Biotype,
+    FormaSpecialis,
+    Isolate,
+    Serotype,
+    Genotype,
+    Morph,
+    Pathogroup,
     // TODO: Unspecified prevents an auto-impl of Ord because it has no defined
     // place in the ordering (like a NaN) so we should manually derive out a
     // PartialOrd impl for TaxRank
@@ -134,6 +143,15 @@ impl TaxRank {
             TaxRank::Varietas => "varietas",
             TaxRank::Forma => "forma",
             TaxRank::Unspecified => "no rank",
+            TaxRank::Clade => "clade",
+            TaxRank::SeroGroup => "serogroup",
+            TaxRank::Biotype => "biotype",
+            TaxRank::FormaSpecialis => "forma specialis",
+            TaxRank::Isolate => "isolate",
+            TaxRank::Serotype => "serotype",
+            TaxRank::Genotype => "genotype",
+            TaxRank::Morph => "morph",
+            TaxRank::Pathogroup => "pathogroup",
             // TODO: not sure if we want to manually coerce everything like this?
             _ => "no rank",
         }
@@ -218,7 +236,16 @@ impl FromStr for TaxRank {
             "cultivar" => Ok(TaxRank::Cultivar),
             "breed" => Ok(TaxRank::Breed),
             "strain" => Ok(TaxRank::Strain),
+            "serogroup" => Ok(TaxRank::SeroGroup),
             "no rank" => Ok(TaxRank::Unspecified),
+            "biotype" => Ok(TaxRank::Biotype),
+            "clade" => Ok(TaxRank::Clade),
+            "forma specialis" => Ok(TaxRank::FormaSpecialis),
+            "isolate" => Ok(TaxRank::Isolate),
+            "serotype" => Ok(TaxRank::Serotype),
+            "genotype" => Ok(TaxRank::Genotype),
+            "morph" => Ok(TaxRank::Morph),
+            "pathogroup" => Ok(TaxRank::Pathogroup),
             _ => Err(TaxonomyError::UnrecognizedRank {
                 rank: s.to_string(),
             }),
