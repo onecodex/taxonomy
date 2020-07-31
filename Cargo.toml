@@ -1,7 +1,7 @@
 [package]
 name = "taxonomy"
-version = "0.5.0"
-authors = ["Roderick Bovee & One Codex <roderick@onecodex.com>"]
+version = "0.6.0"
+authors = ["Roderick Bovee & One Codex <vincent@onecodex.com>"]
 description = "Routines for loading, saving, and manipulating taxonomic trees"
 keywords = ["taxonomy", "bioinformatics"]
 categories = ["command-line-utilities", "science"]
