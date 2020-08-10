@@ -63,35 +63,6 @@ fn get_id(node: &Value, field: &str) -> Result<String> {
     )
 }
 
-fn get_new_node_link_parents(tax_links: &[Value], nodes: &[String]) -> Result<Vec<usize>> {
-    let lookup: HashMap<&str, usize> = nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.as_ref(), i))
-        .collect();
-    let mut parent_ids = vec![0; nodes.len()];
-    for l in tax_links {
-        let str_source = get_id(l, "source")?;
-        let source =
-            lookup
-                .get(&str_source.as_ref())
-                .ok_or_else(|| TaxonomyError::ImportError {
-                    line: 0,
-                    msg: format!("link source \"{}\" is not present in nodes", str_source),
-                })?;
-        let str_target = get_id(l, "target")?;
-        let target =
-            lookup
-                .get(&str_target.as_ref())
-                .ok_or_else(|| TaxonomyError::ImportError {
-                    line: 0,
-                    msg: format!("link target \"{}\" is not present in nodes", str_target),
-                })?;
-        parent_ids[*source] = *target;
-    }
-    Ok(parent_ids)
-}
-
 fn get_old_node_link_parents(tax_links: &[Value], nodes: &[String]) -> Result<Vec<usize>> {
     let mut parent_ids = vec![0; nodes.len()];
     for l in tax_links {
@@ -174,33 +145,7 @@ pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
             msg: "'links' not in JSON".to_string(),
         })?;
 
-    // check if this is an "old" format (networkx <=1.10) or not
-    // the old format used an index into the nodes array instead of the id
-    // itself and since this is a tree, every source node's index should be
-    // present once
-    //
-    // note the format change is only documented one place (and obliquely):
-    // https://github.com/networkx/networkx/issues/2332
-    let is_old_format = tax_links
-        .iter()
-        .try_fold(0, |acc, link| {
-            if let Some(source) = link["source"].as_u64() {
-                Some(acc + source)
-            } else {
-                None
-            }
-        })
-        .map_or_else(
-            || false,
-            |source_sum| source_sum == (tax_links.len() * (tax_links.len() + 1)) as u64 / 2u64,
-        );
-
-    let parent_ids = if is_old_format {
-        get_old_node_link_parents(tax_links, &tax_ids)?
-    } else {
-        get_new_node_link_parents(tax_links, &tax_ids)?
-    };
-
+    let parent_ids = get_old_node_link_parents(tax_links, &tax_ids)?;
     GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None)
 }
 
@@ -419,49 +364,6 @@ mod test {
             "links": [
                 {"source": 1, "target": 0},
                 {"source": 2, "target": 1}
-            ]
-        }"#;
-        let tax = load_json(Cursor::new(example), None)?;
-        assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
-        assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
-        assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
-        assert_eq!(Taxonomy::<usize, _>::children(&tax, 0)?, vec![1]);
-        assert_eq!(Taxonomy::<usize, _>::lineage(&tax, 2)?, vec![2, 1, 0]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_new_node_link_import() -> Result<()> {
-        // try a minimal one to make sure everything's in the right spot
-        let example = r#"{
-            "nodes": [
-                {"id": "1", "name": "root"},
-                {"id": "2", "name": "Bacteria", "rank": "no rank"},
-                {"id": "562", "name": "Escherichia coli", "rank": "species"}
-            ],
-            "links": [
-                {"source": "2", "target": "1"},
-                {"source": "562", "target": "2"}
-            ]
-        }"#;
-        let tax = load_json(Cursor::new(example), None)?;
-        assert_eq!(Taxonomy::<usize, _>::len(&tax), 3);
-        assert_eq!(Taxonomy::<usize, _>::root(&tax), 0);
-        assert_eq!(Taxonomy::<&str, _>::root(&tax), "1");
-        assert_eq!(Taxonomy::<usize, _>::children(&tax, 0)?, vec![1]);
-        assert_eq!(Taxonomy::<usize, _>::lineage(&tax, 2)?, vec![2, 1, 0]);
-
-        // try one with integer keys (and a null rank)
-        let example = r#"{
-            "nodes": [
-                {"id": 1, "name": "root"},
-                {"id": 2, "name": "Bacteria", "rank": null},
-                {"id": 562, "name": "Escherichia coli", "rank": "species"}
-            ],
-            "links": [
-                {"source": 2, "target": 1},
-                {"source": 562, "target": 2}
             ]
         }"#;
         let tax = load_json(Cursor::new(example), None)?;
