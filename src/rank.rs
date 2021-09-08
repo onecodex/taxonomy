@@ -140,6 +140,7 @@ impl TaxRank {
             TaxRank::SpeciesSubgroup => "species subgroup",
             TaxRank::Species => "species",
             TaxRank::Subspecies => "subspecies",
+            TaxRank::Strain => "strain",
             TaxRank::Varietas => "varietas",
             TaxRank::Forma => "forma",
             TaxRank::Unspecified => "no rank",
