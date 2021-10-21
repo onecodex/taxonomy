@@ -335,7 +335,7 @@ impl<'s> Taxonomy<'s, &'s str, f32> for GeneralTaxonomy {
     }
 
     fn children(&self, tax_id: &str) -> Result<Vec<&str>> {
-        let usize_tax_id = self.to_internal_id(&tax_id)?;
+        let usize_tax_id = self.to_internal_id(tax_id)?;
         self.children_lookup[usize_tax_id]
             .iter()
             .map(|x| self.from_internal_id(*x))
@@ -343,7 +343,7 @@ impl<'s> Taxonomy<'s, &'s str, f32> for GeneralTaxonomy {
     }
 
     fn parent(&self, tax_id: &str) -> Result<Option<(&str, f32)>> {
-        let usize_tax_id = self.to_internal_id(&tax_id)?;
+        let usize_tax_id = self.to_internal_id(tax_id)?;
         if usize_tax_id == 0 {
             return Ok(None);
         }
@@ -359,12 +359,12 @@ impl<'s> Taxonomy<'s, &'s str, f32> for GeneralTaxonomy {
     }
 
     fn name(&self, tax_id: &str) -> Result<&str> {
-        let tax_id = self.to_internal_id(&tax_id)?;
+        let tax_id = self.to_internal_id(tax_id)?;
         Ok(&self.names[tax_id])
     }
 
     fn rank(&self, tax_id: &str) -> Result<TaxRank> {
-        let tax_id = self.to_internal_id(&tax_id)?;
+        let tax_id = self.to_internal_id(tax_id)?;
         Ok(self.ranks[tax_id])
     }
 }

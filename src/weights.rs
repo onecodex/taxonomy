@@ -25,7 +25,7 @@ where
     let mut taxs_by_score: BinaryHeap<(W, T)> = BinaryHeap::new();
     let mut stem_ids: HashSet<T> = HashSet::new();
     for tax_id in weights.keys() {
-        if stem_ids.contains(&tax_id) {
+        if stem_ids.contains(tax_id) {
             continue;
         }
         let score = taxonomy
