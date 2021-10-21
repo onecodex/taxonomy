@@ -8,7 +8,7 @@ use std::io::Cursor;
 use std::str::FromStr;
 
 use pyo3::class::{PyIterProtocol, PyMappingProtocol, PyObjectProtocol, PySequenceProtocol};
-use pyo3::exceptions::KeyError;
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{IntoPyDict, PyBytes, PyDict, PyType};
 use pyo3::{create_exception, wrap_pyfunction, wrap_pymodule};
@@ -23,7 +23,7 @@ use crate::rank::TaxRank;
 use crate::taxonomy::Taxonomy as TaxTrait;
 use crate::weights::{maximum_weighted_path as tax_mwp, rollup_weights as tax_rw};
 
-create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::Exception);
+create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::PyException);
 
 /// The data returned when looking up a taxonomy by id or by name
 #[pyclass]
@@ -72,7 +72,7 @@ impl Taxonomy {
     pub(crate) fn get_int_id(&self, key: &str) -> PyResult<usize> {
         self.t
             .to_internal_id(key)
-            .map_err(|_| PyErr::new::<KeyError, _>("Tax ID is not in taxonomy"))
+            .map_err(|_| PyErr::new::<PyKeyError, _>("Tax ID is not in taxonomy"))
     }
 
     pub(crate) fn get_name(&self, key: &str) -> PyResult<&str> {
@@ -388,7 +388,7 @@ impl Taxonomy {
             let parent = self
                 .t
                 .to_internal_id(p)
-                .map_err(|_| PyErr::new::<KeyError, _>("New parent ID is not in taxonomy"))?;
+                .map_err(|_| PyErr::new::<PyKeyError, _>("New parent ID is not in taxonomy"))?;
             if TaxTrait::<IntTaxId, _>::lineage(&self.t, parent)
                 .map_err(|_| PyErr::new::<TaxonomyError, _>("New parent has bad lineage?"))?
                 .contains(&int_id)

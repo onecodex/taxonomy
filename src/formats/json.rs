@@ -114,7 +114,7 @@ pub fn load_node_link_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
     let mut names = Vec::new();
     let mut ranks = Vec::new();
     for n in tax_nodes.iter() {
-        let ncbi_id = get_id(&n, "id")?;
+        let ncbi_id = get_id(n, "id")?;
         tax_ids.push(ncbi_id);
         let name = n["name"]
             .as_str()
@@ -158,7 +158,7 @@ pub fn load_tree_json(tax_json: &Value) -> Result<GeneralTaxonomy> {
         names: &mut Vec<String>,
         ranks: &mut Vec<TaxRank>,
     ) -> Result<()> {
-        let tax_id = get_id(&node, "id").map_err(|_| {
+        let tax_id = get_id(node, "id").map_err(|_| {
             if parent_ids.is_empty() {
                 TaxonomyError::ImportError {
                     line: 0,
