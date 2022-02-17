@@ -18,6 +18,7 @@ class NewickTestCase(unittest.TestCase):
 
     def test_find_node_by_id(self):
         node = self.tax.node("A")
+        self.assertEqual(node, self.tax.node("A"))
         self.assertEqual(node.id, "A")
         self.assertEqual(node.parent, "F")
 
@@ -108,7 +109,7 @@ class NewickTestCase(unittest.TestCase):
 
 class NCBITestCase(unittest.TestCase):
     def _create_tax(self):
-        return Taxonomy.from_ncbi("tests/data/ncbi_subset_tax.nodes.dmp", "tests/data/ncbi_subset_tax.names.dmp")
+        return Taxonomy.from_ncbi("tests/data/")
 
     def setUp(self) -> None:
         self.tax = self._create_tax()

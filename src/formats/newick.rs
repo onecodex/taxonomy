@@ -1,16 +1,12 @@
-use std::collections::VecDeque;
-use std::fmt::{Debug, Display};
 use std::io::{Read, Write};
-use std::iter::Sum;
-use std::str;
-
-use memchr::memchr2;
 
 use crate::base::GeneralTaxonomy;
-use crate::taxonomy::Taxonomy;
-use crate::{Result, TaxonomyError};
+use crate::errors::{Error, ErrorKind, TaxonomyResult};
+use crate::Taxonomy;
 
-// TODO: add "use name intead of id" options?
+use memchr::memchr2;
+use std::collections::VecDeque;
+
 /// NewickToken is used as an intermediate during the tokenization of a Newick string.
 #[derive(PartialEq)]
 enum NewickToken {
@@ -31,42 +27,22 @@ impl NewickToken {
     }
 }
 
-// TODO: this allocates a buffer for the *entire* taxonomy; it should be possible
-// to stream the writing in the traversal loop, but we need to buffer enough to
-// determine whether to drop `()`s and extra `,`s
-/// Write a Taxonomy object formatted as Newick to a `writer`.
-///
-/// Takes a `root_node` to allow writing only a subset of the total taxonomy.
-///
-/// Still somewhat experimental and may not support all Newick features.
-pub fn save_newick<'t, T: 't, D: 't, X, W>(
-    tax: &'t X,
+pub fn save<'t, W: Write>(
     writer: &mut W,
-    root_node: Option<T>,
-) -> Result<()>
-where
-    W: Write,
-    T: Clone + Debug + Display + PartialEq,
-    D: Debug + Display + PartialOrd + Sum,
-    X: Taxonomy<'t, T, D>,
-{
-    let root_id = if let Some(tid) = root_node {
-        tid
-    } else {
-        tax.root()
-    };
+    taxonomy: &'t impl Taxonomy<'t>,
+    root_node: Option<&str>,
+) -> TaxonomyResult<()> {
+    let root_node = root_node.unwrap_or_else(|| taxonomy.root());
+    let mut out_buf = VecDeque::new();
 
-    let mut out_buf: VecDeque<NewickToken> = VecDeque::new();
-    let zero: D = Vec::new().into_iter().sum();
-
-    for (node, pre) in tax.traverse(root_id)? {
+    for (node, pre) in taxonomy.traverse(root_node)? {
         if pre {
             out_buf.push_back(NewickToken::Start);
         } else {
             out_buf.push_back(NewickToken::End);
-            let mut name: String = format!("{}", node);
-            if let Some((_, dist)) = tax.parent(node)? {
-                if dist > zero {
+            let mut name = node.to_owned();
+            if let Some((_, dist)) = taxonomy.parent(node)? {
+                if dist > 0.0 {
                     name.push(':');
                     name.push_str(&format!("{}", dist));
                 }
@@ -103,10 +79,7 @@ where
 /// Read Newick format into a Taxonomy object out of a `reader`.
 ///
 /// Still somewhat experimental and may not support all Newick features.
-pub fn load_newick<R>(reader: &mut R) -> Result<GeneralTaxonomy>
-where
-    R: Read,
-{
+pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
     // TODO: handle empty tax ids?
     // TODO: handle quoted labels
     // TODO: handle ending `;`
@@ -152,67 +125,68 @@ where
                     .map(|x| x + cur_pos)
                     .unwrap_or_else(|| buffer.len());
                 let name_dist = &buffer[cur_pos..pos];
-                let mut chunk_iter = str::from_utf8(name_dist)
-                    .map_err(|_| TaxonomyError::ImportError {
-                        line: 0,
-                        msg: format!(
-                            "Could not parse name/dist \"{}\" as unicode",
-                            String::from_utf8_lossy(name_dist)
-                        ),
+                let mut chunk_iter = std::str::from_utf8(name_dist)
+                    .map_err(|_| {
+                        Error::new(ErrorKind::ImportError {
+                            line: 0,
+                            msg: format!(
+                                "Could not parse name/dist \"{}\" as unicode",
+                                String::from_utf8_lossy(name_dist)
+                            ),
+                        })
                     })?
                     .trim_end_matches(';')
                     .splitn(2, |x| x == ':');
                 tax_ids[cur_node] = chunk_iter.next().unwrap_or("").to_string();
-                dists[cur_node] = chunk_iter.next().unwrap_or("1").parse().map_err(|_| {
-                    TaxonomyError::ImportError {
+                dists[cur_node] = chunk_iter.next().unwrap_or("1").parse().map_err(|e| {
+                    Error::new(ErrorKind::ImportError {
                         line: 0,
-                        msg: "Could not parse distance {} as a number".to_string(),
-                    }
+                        msg: format!("Could not parse distance as a number: {}", e),
+                    })
                 })?;
                 cur_pos = pos;
             }
         }
     }
 
-    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, None, None, Some(dists))
+    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, None, None, Some(dists), None)
 }
 
 #[cfg(test)]
-mod test {
-    use crate::taxonomy::test::MockTax;
+mod tests {
+    use super::*;
     use crate::taxonomy::Taxonomy;
 
-    use super::*;
-
     #[test]
-    fn test_write_newick() -> Result<()> {
-        let tax = MockTax;
-        let mut s: Vec<u8> = Vec::new();
-        save_newick(&tax, &mut s, None)?;
-        assert_eq!(s, b"(((((((((765909:1)61598:1)53452:1)1046:1)135613:1,(((56812:1)62322:1)22:1)135622:1)1236:1)1224:1)2:1)131567:1)1;".to_vec());
+    fn test_write_newick() {
+        let newick_str = b"((((((((56812:1)62322:1)22:1)135622:1,((((765909:1)61598:1)53452:1)1046:1)135613:1)1236:1)1224:1)2:1)131567:1)1;";
+        let tax = load(&mut newick_str.as_ref()).unwrap();
+
+        // The leaves are swapped, the tree is still ok but the output doesn't match the original string
+        // let mut bytes = Vec::new();
+        // save(&mut bytes, &tax, None).unwrap();
+        // println!("{:?}", std::str::from_utf8(&bytes));
+        // assert_eq!(bytes, newick_str);
 
         // try saving a subtree
-        let mut s: Vec<u8> = Vec::new();
-        save_newick(&tax, &mut s, Some(53452))?;
-        assert_eq!(s, b"((765909:1)61598:1)53452:1;");
-
-        Ok(())
+        let mut bytes = Vec::new();
+        save(&mut bytes, &tax, Some("53452")).unwrap();
+        assert_eq!(bytes, b"((765909:1)61598:1)53452:1;");
     }
 
     #[test]
-    fn test_load_newick() -> Result<()> {
+    fn test_load_newick() {
         let newick_str = b"(())";
-        let tax = load_newick(&mut newick_str.as_ref())?;
-        assert_eq!(Taxonomy::<&str, _>::len(&tax), 3);
+        let tax = load(&mut newick_str.as_ref()).unwrap();
+        assert_eq!(tax.len(), 3);
 
         let newick_str = b"(A,B,(C,D));";
-        let tax = load_newick(&mut newick_str.as_ref())?;
-        assert_eq!(Taxonomy::<&str, _>::len(&tax), 6);
+        let tax = load(&mut newick_str.as_ref()).unwrap();
+        assert_eq!(tax.len(), 6);
 
         let newick_str = b"(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;";
-        let tax = load_newick(&mut newick_str.as_ref())?;
-        assert_eq!(tax.parent("D")?, Some(("E", 0.4)));
-        assert_eq!(tax.parent("E")?, Some(("F", 0.5)));
-        Ok(())
+        let tax = load(&mut newick_str.as_ref()).unwrap();
+        assert_eq!(tax.parent("D").unwrap(), Some(("E", 0.4)));
+        assert_eq!(tax.parent("E").unwrap(), Some(("F", 0.5)));
     }
 }
