@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use crate::{Result, TaxonomyError};
+use crate::errors::{Error, ErrorKind, TaxonomyResult};
 
 /// A taxonomic rank. For example, a species or phylum.
 ///
@@ -160,9 +160,9 @@ impl TaxRank {
 }
 
 impl FromStr for TaxRank {
-    type Err = TaxonomyError;
+    type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> TaxonomyResult<Self> {
         // many of these synonyms (and the ranks themselves) were pulled from:
         // https://en.wikipedia.org/wiki/Taxonomic_rank
         match s.trim().to_lowercase().as_ref() {
@@ -247,21 +247,16 @@ impl FromStr for TaxRank {
             "genotype" => Ok(TaxRank::Genotype),
             "morph" => Ok(TaxRank::Morph),
             "pathogroup" => Ok(TaxRank::Pathogroup),
-            _ => Err(TaxonomyError::UnrecognizedRank {
-                rank: s.to_string(),
-            }),
+            _ => Err(Error::new(ErrorKind::UnknownRank(s.to_string()))),
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use crate::Result;
-
     use super::TaxRank;
     use super::TaxRank::*;
+    use std::str::FromStr;
 
     static RANKS: &[super::TaxRank] = &[
         Domain,
@@ -353,11 +348,10 @@ mod test {
     }
 
     #[test]
-    fn test_str_to_rank() -> Result<()> {
+    fn test_str_to_rank() {
         for rank in RANKS.iter() {
-            let _ = TaxRank::from_str(rank.to_ncbi_rank())?;
+            assert!(TaxRank::from_str(rank.to_ncbi_rank()).is_ok());
         }
         assert!(TaxRank::from_str("fake_data").is_err());
-        Ok(())
     }
 }

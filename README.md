@@ -38,10 +38,9 @@ Taxonomy can be loaded from a variety of sources.
 
 1. `Taxonomy.from_newick(value: str)`: loads a Taxonomy from a Newick-encoded string.
 
-2. `Taxonomy.from_ncbi(nodes_path: str, names_path: str)`: loads a Taxonomy from a pair of NCBI dump files. The paths specified are
-to the individual files in the NCBI taxonomy directory (e.g. nodes.dmp and names.dmp).
+2. `Taxonomy.from_ncbi(ncbi_filder: str)`: loads a Taxonomy from a pair of NCBI dump files. The folder needs to contain the individual files in the NCBI taxonomy directory (e.g. nodes.dmp and names.dmp).
 
-3. `Taxonomy.from_json(value: str, /, path: List[str])`: loads a Taxonomy from a JSON-encoded string. The format can either be
+3. `Taxonomy.from_json(value: str, /, json_pointer: str)`: loads a Taxonomy from a JSON-encoded string. The format can either be
 of the tree or node_link_data types and will be automatically detected. If `path` is specified, the JSON will be traversed to that sub-object before being parsed as a taxonomy.
 
 4. `Taxonomy.from_phyloxml(value: &str)`: loads a Taxonomy from a PhyloXML-encoded string. **Experimental**
@@ -51,9 +50,8 @@ of the tree or node_link_data types and will be automatically detected. If `path
 Assuming that the taxonomy has been instantiated as a variable named `tax`.
 
 1. `tax.to_newick()`: exports a Taxonomy as a Newick-encoded byte string.
-
-2. `tax.to_json(/, as_node_link_data: bool)`: exports a Taxonomy as a JSON-encoded byte string. By default, the JSON format 
-is a tree format unless the `as_node_link_data` parameter is set to True.
+2. `tax.to_json_tree()`: exports a Taxonomy as a JSON-encoded byte string in a tree format
+3. `tax.to_json_node_links()`: exports a Taxonomy as a JSON-encoded byte string in a node links format
 
 ### Using a taxonomy
 
@@ -69,8 +67,8 @@ class TaxonomyNode:
 ```
 
 Note that tax_id in parameters passed in functions described below are string but for example in the case of NCBI need
-to be essentially quoting integers: `562 -> "562"`. In that case, passing something that can't be converted to a number
-will raise an exception even if the documentation below does not mention it.
+to be essentially quoting integers: `562 -> "562"`. 
+If you loaded a taxonomy via JSON and you had additional data in your file, you can access it via indexing, `node["readcount"]` for example.
 
 #### `tax.root -> TaxonomyNode`
 Points to the root of the taxonomy

@@ -1,55 +1,18 @@
-// On PhyloXML
-//
-// http://etetoolkit.org/docs/latest/tutorial/tutorial_phyloxml.html
-// https://biopython.org/wiki/PhyloXML
-// http://www.phyloxml.org/
-
-// On Rust XML parsing
-//
-// https://github.com/tafia/quick-xml
-// https://docs.rs/quick-xml/0.12.4/quick_xml/
-// https://docs.rs/quick-xml/0.12.4/quick_xml/struct.Reader.html
-
-use std::collections::HashMap;
-use std::fmt::{Debug, Display};
-use std::io::{BufReader, Read, Write};
-use std::iter::Sum;
-use std::str::FromStr;
+use std::io::{BufReader, Read};
 
 use quick_xml::events::Event;
-use quick_xml::Reader;
 
 use crate::base::GeneralTaxonomy;
+use crate::errors::{Error, ErrorKind, TaxonomyResult};
 use crate::rank::TaxRank;
-use crate::taxonomy::Taxonomy;
-use crate::{Result, TaxonomyError};
-
-/// Write a Taxonomy object out to a `writer` in the PhyloXML format.
-///
-/// Completely unimplemented.
-pub fn save_phyloxml<'t, T: 't, D: 't, X, W>(
-    _tax: &'t X,
-    _writer: &mut W,
-    _root_node: Option<T>,
-) -> Result<()>
-where
-    W: Write,
-    T: Clone + Debug + Display + PartialEq,
-    D: Debug + Display + PartialOrd + Sum,
-    X: Taxonomy<'t, T, D>,
-{
-    unimplemented!("This feature isn't complete yet")
-}
+use std::collections::HashMap;
+use std::str::FromStr;
 
 /// Read PhyloXML format into a Taxonomy object out of a `reader`.
 ///
-/// Still somewhat experimental and may not support all Newick features.
-pub fn load_phyloxml<R>(reader: &mut R) -> Result<GeneralTaxonomy>
-where
-    R: Read,
-{
-    let buf_reader = BufReader::new(reader);
-    let mut xml_reader = Reader::from_reader(buf_reader);
+/// Still somewhat experimental and may not support all PhyloXML features.
+pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
+    let mut xml_reader = quick_xml::Reader::from_reader(BufReader::new(reader));
     xml_reader.trim_text(true);
 
     // find the <phylogeny> inside the XML
@@ -63,10 +26,10 @@ where
                 }
             }
             Event::Eof => {
-                return Err(TaxonomyError::ImportError {
+                return Err(Error::new(ErrorKind::ImportError {
                     line: 0,
-                    msg: "No valid phyloxml taxonomy found".to_string(),
-                })
+                    msg: "No valid phyloxml taxonomy found".to_owned(),
+                }));
             }
             _ => continue,
         }
@@ -87,10 +50,10 @@ where
             Event::Start(ref e) => {
                 match e.name() {
                     b"phylogeny" => {
-                        return Err(TaxonomyError::ImportError {
+                        return Err(Error::new(ErrorKind::ImportError {
                             line: 0,
-                            msg: "Nested phylogeny not permitted".to_string(),
-                        })
+                            msg: "Nested phylogeny not permitted".to_owned(),
+                        }));
                     }
                     b"clade" => {
                         let attributes: HashMap<&[u8], String> = e
@@ -116,10 +79,12 @@ where
                                 .get(&&b"branch_length"[..])
                                 .unwrap_or(&"1".to_string())
                                 .parse()
-                                .map_err(|_| TaxonomyError::ImportError {
-                                    line: 0,
-                                    msg: "Could not interpret branch length as a number"
-                                        .to_string(),
+                                .map_err(|_| {
+                                    Error::new(ErrorKind::ImportError {
+                                        line: 0,
+                                        msg: "Could not interpret branch length as a number"
+                                            .to_owned(),
+                                    })
                                 })?,
                         );
                         ranks.push(TaxRank::Unspecified);
@@ -146,11 +111,12 @@ where
                     b"name" => *names.last_mut().unwrap() = Some(text),
                     b"id" => *tax_ids.last_mut().unwrap() = text,
                     b"branch_length" => {
-                        *dists.last_mut().unwrap() =
-                            text.parse().map_err(|_| TaxonomyError::ImportError {
+                        *dists.last_mut().unwrap() = text.parse().map_err(|_| {
+                            Error::new(ErrorKind::ImportError {
                                 line: 0,
                                 msg: "Could not interpret branch length as a number".to_string(),
-                            })?
+                            })
+                        })?;
                     }
                     b"rank" => *ranks.last_mut().unwrap() = TaxRank::from_str(&text)?,
                     // TODO: do something with confidence scores?
@@ -172,19 +138,21 @@ where
     let cleaned_names: Option<Vec<String>> = if has_any_names {
         None
     } else {
-        Some(
-            names
-                .into_iter()
-                .map(|n| n.unwrap_or_else(|| "".to_string()))
-                .collect(),
-        )
+        Some(names.into_iter().map(|n| n.unwrap_or_default()).collect())
     };
 
     // if not everything has a tax id, should we try to use the names instead?
     // or should we should have a fallback that makes up an ID for this (and
     // for Newick trees) for anything that doesn't have any kind of identifier?
 
-    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, cleaned_names, Some(ranks), Some(dists))
+    GeneralTaxonomy::from_arrays(
+        tax_ids,
+        parent_ids,
+        cleaned_names,
+        Some(ranks),
+        Some(dists),
+        None,
+    )
 }
 
 #[cfg(test)]
@@ -192,9 +160,10 @@ mod test {
     use std::io::Cursor;
 
     use super::*;
+    use crate::taxonomy::Taxonomy;
 
     #[test]
-    fn test_load_phyloxml() -> Result<()> {
+    fn test_load_phyloxml() {
         let text_xml = r#"
         <phylogeny rooted="true">
           <name>test taxonomy</name>
@@ -223,8 +192,8 @@ mod test {
         </phylogeny>
         "#;
         let mut text_cursor = Cursor::new(text_xml);
-        let tax = load_phyloxml(&mut text_cursor)?;
-        assert_eq!(Taxonomy::<&str, f32>::len(&tax), 5);
+        let tax = load(&mut text_cursor).unwrap();
+        assert_eq!(tax.len(), 5);
 
         let text_xml = r#"
         <phylogeny rooted="true">
@@ -245,18 +214,16 @@ mod test {
         </phylogeny>
         "#;
         let mut text_cursor = Cursor::new(text_xml);
-        let tax = load_phyloxml(&mut text_cursor)?;
-        assert_eq!(Taxonomy::<&str, f32>::len(&tax), 5);
-        Ok(())
+        let tax = load(&mut text_cursor).unwrap();
+        assert_eq!(tax.len(), 5);
     }
 
     #[test]
-    fn test_no_valid_phyloxml() -> Result<()> {
+    fn test_no_valid_phyloxml() {
         let text_xml = r#"
         <document></document>
         "#;
         let mut text_cursor = Cursor::new(text_xml);
-        assert!(load_phyloxml(&mut text_cursor).is_err());
-        Ok(())
+        assert!(load(&mut text_cursor).is_err());
     }
 }
