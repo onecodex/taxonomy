@@ -68,6 +68,41 @@ impl GeneralTaxonomy {
         }
     }
 
+    /// Ensures that all nodes go back to a root and raise an error otherwise
+    fn validate(&self) -> TaxonomyResult<()> {
+        if self.parent_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut nodes_ok = HashSet::with_capacity(self.tax_ids.len());
+        nodes_ok.insert(self.parent_ids[0]);
+
+        for i in &self.parent_ids {
+            let mut evaluated = HashSet::new();
+            evaluated.insert(*i);
+            let mut current = *i;
+
+            loop {
+                let parent = self.parent_ids[current];
+                if nodes_ok.contains(&parent) {
+                    break;
+                }
+                if evaluated.contains(&parent) {
+                    return Err(Error::new(ErrorKind::InvalidTaxonomy(
+                        "Cycle detected in taxonomy".to_owned(),
+                    )));
+                }
+
+                evaluated.insert(parent);
+                current = parent;
+            }
+
+            nodes_ok.extend(evaluated);
+        }
+
+        Ok(())
+    }
+
     #[inline]
     pub(crate) fn to_internal_index(&self, tax_id: &str) -> TaxonomyResult<usize> {
         self.tax_id_lookup.get(tax_id).map_or_else(
@@ -139,6 +174,7 @@ impl GeneralTaxonomy {
             children_lookup: vec![Vec::new(); size],
         };
         tax.index();
+        tax.validate()?;
         Ok(tax)
     }
 
@@ -454,5 +490,31 @@ mod tests {
         assert_eq!(pruned_tax.len(), 3);
         assert_eq!(pruned_tax.children("1").unwrap(), vec!["2"]);
         assert!(pruned_tax.data("1").unwrap().get("readcount").is_some());
+    }
+
+    #[test]
+    fn errors_on_taxonomy_with_cycle() {
+        let example = r#"{
+            "nodes": [
+                {"id": "1", "name": "root", "readcount": 1000},
+                {"id": "2", "name": "Bacteria", "rank": "no rank", "readcount": 1000},
+                {"id": "562", "name": "Escherichia coli", "rank": "species", "readcount": 1000},
+                {"id": "1000", "name": "Covid", "rank": "", "readcount": 1000},
+                {"id": "2000", "name": "Covid-2", "rank": "", "readcount": 1000}
+            ],
+            "links": [
+                {"source": 1, "target": 0},
+                {"source": 2, "target": 1},
+                {"source": 3, "target": 4},
+                {"source": 4, "target": 3}
+            ]
+        }"#;
+
+        let res = load(Cursor::new(example), None);
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err().kind,
+            ErrorKind::InvalidTaxonomy("Cycle detected in taxonomy".to_owned())
+        );
     }
 }
