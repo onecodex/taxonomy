@@ -106,6 +106,7 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
         }
         tax_nodes.push(node);
     }
+    // TODO: is that needed?
     tax_nodes.sort_unstable_by(|a, b| {
         let tax_id_a = a.id.parse::<usize>().unwrap();
         let tax_id_b = b.id.parse::<usize>().unwrap();
@@ -234,9 +235,9 @@ fn load_tree_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
     )
 }
 
-pub fn load<R: Read>(reader: R, path: Option<&str>) -> TaxonomyResult<GeneralTaxonomy> {
+pub fn load<R: Read>(reader: R, json_pointer: Option<&str>) -> TaxonomyResult<GeneralTaxonomy> {
     let tax_json: Value = serde_json::from_reader(reader)?;
-    let actual_tax_json = if let Some(p) = path {
+    let actual_tax_json = if let Some(p) = json_pointer {
         tax_json.pointer(p).ok_or_else(|| {
             Error::new(ErrorKind::ImportError {
                 line: 0,

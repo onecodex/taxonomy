@@ -11,7 +11,7 @@ pub enum ErrorKind {
 
 #[derive(Debug)]
 pub struct Error {
-    kind: ErrorKind,
+    pub(crate) kind: ErrorKind,
     source: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 
