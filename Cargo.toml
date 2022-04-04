@@ -26,13 +26,8 @@ crate-type=["cdylib", "rlib"]
 bench = false
 
 [dev-dependencies]
-criterion = "0.3"
 rand = "0.8"
 tempfile = "3.3"
-
-[[bench]]
-name = "taxonomy"
-harness = false
 
 [package.metadata.maturin]
 classifier = ["Intended Audience :: Science/Research", "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Topic :: Scientific/Engineering :: Bio-Informatics"]

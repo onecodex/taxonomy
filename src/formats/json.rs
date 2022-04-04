@@ -3,7 +3,7 @@ use std::fmt;
 use std::io::{Read, Write};
 use std::str::FromStr;
 
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, to_value, to_writer, Value};
 
 use crate::base::GeneralTaxonomy;
@@ -60,6 +60,13 @@ where
     TaxRank::from_str(&s).map_err(de::Error::custom)
 }
 
+fn serialize_tax_rank<S>(x: &TaxRank, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(x.to_ncbi_rank())
+}
+
 fn default_tax_rank() -> TaxRank {
     TaxRank::Unspecified
 }
@@ -70,6 +77,7 @@ struct TaxNode {
     id: String,
     name: String,
     #[serde(deserialize_with = "deserialize_tax_rank")]
+    #[serde(serialize_with = "serialize_tax_rank")]
     #[serde(default = "default_tax_rank")]
     rank: TaxRank,
 
@@ -106,12 +114,23 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
         }
         tax_nodes.push(node);
     }
-    // TODO: is that needed?
+
+    // The JSON import might be messed up so we sort the nodes by ids
+    // but since the links refer to their position, we need to first record them
+    #[allow(clippy::needless_collect)]
+    let initial_positions: Vec<_> = tax_nodes.iter().map(|n| n.id.clone()).collect();
     tax_nodes.sort_unstable_by(|a, b| {
         let tax_id_a = a.id.parse::<usize>().unwrap();
         let tax_id_b = b.id.parse::<usize>().unwrap();
         tax_id_a.cmp(&tax_id_b)
     });
+    let after_positions: Vec<_> = tax_nodes.iter().map(|n| &n.id).collect();
+
+    let mut idx_mapping_after_sorting = HashMap::new();
+    for (i, id) in initial_positions.into_iter().enumerate() {
+        idx_mapping_after_sorting
+            .insert(i, after_positions.iter().position(|p| *p == &id).unwrap());
+    }
 
     let tax_links = tax_json["links"]
         .as_array()
@@ -157,7 +176,22 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
                 ),
             }));
         }
-        parent_ids[link.source] = link.target;
+
+        // Then we need to fix up the parents if needed since we might have re-ordered
+        // content
+        let fixed_source = idx_mapping_after_sorting[&link.source];
+        let fixed_target = idx_mapping_after_sorting[&link.target];
+
+        parent_ids[fixed_source] = fixed_target;
+        // parent should always be higher than child in the tree and since we might
+        // have moved things around we need to ensure it stays the case
+        if fixed_target > fixed_source {
+            parent_ids[fixed_target] = fixed_source;
+        } else {
+            parent_ids[fixed_source] = fixed_target;
+        }
+        parent_ids[idx_mapping_after_sorting[&link.source]] =
+            idx_mapping_after_sorting[&link.target];
     }
 
     GeneralTaxonomy::from_arrays(
@@ -365,15 +399,13 @@ mod tests {
         assert_eq!(tax.data("1").unwrap()["readcount"].as_i64().unwrap(), 1000);
         // Converting to Value should give us the same data
         let serialized = serialize_as_node_links(&tax, tax.root()).unwrap();
-        let serialized_input: NodeLinkFormat = from_str(example).unwrap();
-        assert_eq!(
-            serialized.as_object().unwrap()["nodes"],
-            to_value(serialized_input.nodes).unwrap()
-        );
-        assert_eq!(
-            serialized.as_object().unwrap()["links"],
-            to_value(serialized_input.links).unwrap()
-        );
+
+        let tax2 = load_node_link_json(&serialized).unwrap();
+        assert_eq!(tax2.len(), 3);
+        assert_eq!(tax2.root(), "1");
+        assert_eq!(tax2.children("1").unwrap(), vec!["2"]);
+        assert_eq!(tax2.lineage("562").unwrap(), vec!["562", "2", "1"]);
+        assert_eq!(tax2.data("1").unwrap()["readcount"].as_i64().unwrap(), 1000);
     }
 
     #[test]
@@ -426,14 +458,119 @@ mod tests {
     }
 
     #[test]
-    fn can_load_node_link_and_fix_order_matter() {
+    fn can_load_node_link_and_fix_order_them() {
         let example = r#"
-{"multigraph": false, "directed": true, "graph": [], "nodes": [{"name": "Bacillus subtilis subsp. subtilis", "rank": "subspecies", "id": 135461}, {"name": "Staphylococcus aureus", "rank": "species", "id": 1280}, {"name": "Mycobacterium", "rank": "genus", "id": 1763}, {"name": "Klebsiella", "rank": "genus", "id": 570}, {"name": "Bacillus anthracis str. 'Ames Ancestor'", "rank": "strain", "id": 261594}, {"name": "Deinococcaceae", "rank": "family", "id": 183710}, {"name": "Escherichia coli str. K-12 substr. MG1655", "rank": "no rank", "id": 511145}, {"name": "Escherichia coli K-12", "rank": "strain", "id": 83333}, {"name": "Mycobacterium tuberculosis H37Rv", "rank": "strain", "id": 83332}, {"name": "Salmonella enterica subsp. enterica serovar Typhimurium str. LT2", "rank": "strain", "id": 99287}, {"name": "Bacillus subtilis group", "rank": "species group", "id": 653685}, {"name": "root", "rank": "no rank", "id": 1}, {"name": "cellular organisms", "rank": "no rank", "id": 131567}, {"name": "Klebsiella pneumoniae subsp. pneumoniae", "rank": "subspecies", "id": 72407}, {"name": "Deinococci", "rank": "class", "id": 188787}, {"name": "Terrabacteria group", "rank": "clade", "id": 1783272}, {"name": "Klebsiella pneumoniae subsp. pneumoniae HS11286", "rank": "strain", "id": 1125630}, {"name": "Actinomycetia", "rank": "class", "id": 1760}, {"name": "Salmonella enterica subsp. enterica", "rank": "subspecies", "id": 59201}, {"name": "Bacillus anthracis", "rank": "species", "id": 1392}, {"name": "Bacillus", "rank": "genus", "id": 1386}, {"name": "Wolbachia", "rank": "genus", "id": 953}, {"name": "Deinococcus", "rank": "genus", "id": 1298}, {"name": "Firmicutes", "rank": "phylum", "id": 1239}, {"name": "Escherichia", "rank": "genus", "id": 561}, {"name": "Proteobacteria", "rank": "phylum", "id": 1224}, {"name": "Vibrio cholerae MS6", "rank": "strain", "id": 1420885}, {"name": "Escherichia coli", "rank": "species", "id": 562}, {"name": "Staphylococcus", "rank": "genus", "id": 1279}, {"name": "Wolbachieae", "rank": "tribe", "id": 952}, {"name": "Vibrionales", "rank": "order", "id": 135623}, {"name": "Salmonella enterica", "rank": "species", "id": 28901}, {"name": "Vibrio", "rank": "genus", "id": 662}, {"name": "Bacillus cereus group", "rank": "species group", "id": 86661}, {"name": "Mycobacteriaceae", "rank": "family", "id": 1762}, {"name": "Enterobacteriaceae", "rank": "family", "id": 543}, {"name": "Bacillaceae", "rank": "family", "id": 186817}, {"name": "Bacillus subtilis", "rank": "species", "id": 1423}, {"name": "Vibrionaceae", "rank": "family", "id": 641}, {"name": "Enterobacterales", "rank": "order", "id": 91347}, {"name": "Salmonella", "rank": "genus", "id": 590}, {"name": "Wolbachia pipientis", "rank": "species", "id": 955}, {"name": "Vibrio cholerae", "rank": "species", "id": 666}, {"name": "Anaplasmataceae", "rank": "family", "id": 942}, {"name": "Bacillus subtilis subsp. subtilis str. 168", "rank": "strain", "id": 224308}, {"name": "Deinococcus-Thermus", "rank": "phylum", "id": 1297}, {"name": "Klebsiella/Raoultella group", "rank": "no rank", "id": 2890311}, {"name": "Gammaproteobacteria", "rank": "class", "id": 1236}, {"name": "Deinococcus radiodurans", "rank": "species", "id": 1299}, {"name": "Actinobacteria", "rank": "phylum", "id": 201174}, {"name": "Staphylococcaceae", "rank": "family", "id": 90964}, {"name": "Klebsiella pneumoniae", "rank": "species", "id": 573}, {"name": "Deinococcales", "rank": "order", "id": 118964}, {"name": "Mycobacterium tuberculosis", "rank": "species", "id": 1773}, {"name": "Salmonella enterica subsp. enterica serovar Typhimurium", "rank": "no rank", "id": 90371}, {"name": "Bacillales", "rank": "order", "id": 1385}, {"name": "Alphaproteobacteria", "rank": "class", "id": 28211}, {"name": "Corynebacteriales", "rank": "order", "id": 85007}, {"name": "Mycobacterium tuberculosis complex", "rank": "species group", "id": 77643}, {"name": "Bacteria", "rank": "superkingdom", "id": 2}, {"name": "Staphylococcus aureus subsp. aureus NCTC 8325", "rank": "strain", "id": 93061}, {"name": "Bacilli", "rank": "class", "id": 91061}, {"name": "Rickettsiales", "rank": "order", "id": 766}], "links": [{"source": 59, "target": 12}, {"source": 35, "target": 39}, {"source": 24, "target": 35}, {"source": 27, "target": 24}, {"source": 3, "target": 46}, {"source": 51, "target": 3}, {"source": 40, "target": 35}, {"source": 38, "target": 30}, {"source": 32, "target": 38}, {"source": 42, "target": 32}, {"source": 62, "target": 56}, {"source": 43, "target": 62}, {"source": 29, "target": 43}, {"source": 21, "target": 29}, {"source": 41, "target": 21}, {"source": 25, "target": 59}, {"source": 47, "target": 25}, {"source": 23, "target": 15}, {"source": 28, "target": 50}, {"source": 1, "target": 28}, {"source": 45, "target": 15}, {"source": 22, "target": 5}, {"source": 48, "target": 22}, {"source": 55, "target": 61}, {"source": 20, "target": 36}, {"source": 19, "target": 33}, {"source": 37, "target": 10}, {"source": 17, "target": 49}, {"source": 34, "target": 57}, {"source": 2, "target": 34}, {"source": 53, "target": 58}, {"source": 56, "target": 25}, {"source": 31, "target": 40}, {"source": 18, "target": 31}, {"source": 13, "target": 51}, {"source": 58, "target": 2}, {"source": 8, "target": 53}, {"source": 7, "target": 27}, {"source": 57, "target": 17}, {"source": 33, "target": 20}, {"source": 54, "target": 18}, {"source": 50, "target": 55}, {"source": 61, "target": 23}, {"source": 39, "target": 47}, {"source": 60, "target": 1}, {"source": 9, "target": 54}, {"source": 52, "target": 14}, {"source": 12, "target": 11}, {"source": 0, "target": 37}, {"source": 30, "target": 47}, {"source": 5, "target": 52}, {"source": 36, "target": 55}, {"source": 14, "target": 45}, {"source": 49, "target": 15}, {"source": 44, "target": 0}, {"source": 4, "target": 19}, {"source": 6, "target": 7}, {"source": 10, "target": 20}, {"source": 16, "target": 13}, {"source": 26, "target": 42}, {"source": 15, "target": 59}, {"source": 46, "target": 35}]}
-        "#;
+{
+  "multigraph": false,
+  "directed": true,
+  "graph": [],
+  "nodes": [
+    {
+      "name": "root",
+      "rank": "no rank",
+      "id": 1
+    },
+    {
+      "name": "genus 2",
+      "rank": "genus",
+      "id": 9
+    },
+    {
+      "name": "superkingdom 1",
+      "rank": "superkingdom",
+      "id": 2
+    },
+    {
+      "name": "species 2.1",
+      "rank": "species",
+      "id": 11
+    },
+    {
+      "name": "genus 1",
+      "rank": "genus",
+      "id": 8
+    },
+    {
+      "name": "class 1",
+      "rank": "class",
+      "id": 5
+    },
+    {
+      "name": "kingdom 1",
+      "rank": "kingdom",
+      "id": 3
+    },
+    {
+      "name": "phylum 1",
+      "rank": "phylum",
+      "id": 4
+    },
+    {
+      "name": "order 1",
+      "rank": "order",
+      "id": 6
+    },
+    {
+      "name": "family 1",
+      "rank": "family",
+      "id": 7
+    },
+    {
+      "name": "species 1.1",
+      "rank": "species",
+      "id": 10
+    }
+  ],
+  "links": [
+    {
+      "source": 3,
+      "target": 1
+    },
+    {
+      "source": 10,
+      "target": 4
+    },
+    {
+      "source": 1,
+      "target": 9
+    },
+    {
+      "source": 4,
+      "target": 9
+    },
+    {
+      "source": 9,
+      "target": 8
+    },
+    {
+      "source": 8,
+      "target": 5
+    },
+    {
+      "source": 5,
+      "target": 7
+    },
+    {
+      "source": 7,
+      "target": 6
+    },
+    {
+      "source": 6,
+      "target": 2
+    },
+    {
+      "source": 2,
+      "target": 0
+    }
+  ]
+}        "#;
         let tax = load(Cursor::new(example), None).unwrap();
-        assert_eq!(tax.len(), 63);
+        assert_eq!(tax.len(), 11);
         assert_eq!(tax.root(), "1");
-        assert_eq!(tax.lineage("562").unwrap(), vec!["562"]);
+        assert_eq!(
+            tax.lineage("10").unwrap(),
+            vec!["10", "8", "7", "6", "5", "4", "3", "2", "1"]
+        );
     }
 
     #[test]

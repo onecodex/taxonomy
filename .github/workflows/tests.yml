@@ -63,7 +63,7 @@ jobs:
           . venv/bin/activate
           python test_python.py
 
-      - name: compile taxonomy with python bindings
+      - name: compile taxonomy with python bindings in release mode
         run: |
           . venv/bin/activate
           maturin build --cargo-extra-args="--features=python" --release --strip --manylinux=off
