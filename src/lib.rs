@@ -9,9 +9,9 @@ mod python;
 mod rank;
 mod taxonomy;
 
+pub use crate::taxonomy::Taxonomy;
 pub use base::GeneralTaxonomy;
 pub use formats::json;
 pub use formats::ncbi;
 pub use formats::newick;
 pub use formats::phyloxml;
-pub use taxonomy::Taxonomy;
