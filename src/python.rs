@@ -1,11 +1,9 @@
 use std::collections::HashMap;
 use std::io::Cursor;
 
+use pyo3::create_exception;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList, PyType};
-use pyo3::{
-    create_exception, PyIterProtocol, PyMappingProtocol, PyObjectProtocol, PySequenceProtocol,
-};
 use serde_json::Value;
 
 use crate::json::JsonFormat;
@@ -28,8 +26,6 @@ macro_rules! py_try {
         $call.map_err(|_| PyErr::new::<TaxonomyError, _>($msg.to_owned()))?
     };
 }
-
-// child_readcount = sum([graph.nodes[int(tid)]["readcount"] for tid in child_tax_ids])
 
 fn json_value_to_pyobject(val: &Value) -> PyObject {
     let gil_guard = Python::acquire_gil();
@@ -81,8 +77,8 @@ pub struct TaxonomyNode {
     extra: HashMap<String, Value>,
 }
 
-#[pyproto]
-impl PyObjectProtocol for TaxonomyNode {
+#[pymethods]
+impl TaxonomyNode {
     fn __richcmp__(&self, other: PyRef<TaxonomyNode>, op: CompareOp) -> Py<PyAny> {
         let py = other.py();
         match op {
@@ -91,10 +87,7 @@ impl PyObjectProtocol for TaxonomyNode {
             _ => py.NotImplemented(),
         }
     }
-}
 
-#[pyproto]
-impl PyMappingProtocol for TaxonomyNode {
     fn __getitem__(&self, obj: &PyAny) -> PyResult<PyObject> {
         let key: &str = obj.extract()?;
         let gil_guard = Python::acquire_gil();
@@ -459,17 +452,11 @@ impl Taxonomy {
         let key: &str = self.tax.root();
         self.as_node(key).unwrap()
     }
-}
 
-#[pyproto]
-impl PyObjectProtocol for Taxonomy {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!("<Taxonomy ({} nodes)>", self.tax.len()))
     }
-}
 
-#[pyproto]
-impl PyMappingProtocol for Taxonomy {
     fn __len__(&self) -> PyResult<usize> {
         Ok(self.tax.len())
     }
@@ -484,17 +471,11 @@ impl PyMappingProtocol for Taxonomy {
     fn __delitem__(&mut self, tax_id: &str) -> PyResult<()> {
         Ok(py_try!(self.tax.remove(tax_id)))
     }
-}
 
-#[pyproto]
-impl PySequenceProtocol for Taxonomy {
     fn __contains__(&self, tax_id: &str) -> PyResult<bool> {
         Ok(self.tax.to_internal_index(tax_id).is_ok())
     }
-}
 
-#[pyproto]
-impl PyIterProtocol for Taxonomy {
     fn __iter__(slf: PyRefMut<Self>) -> PyResult<TaxonomyIterator> {
         let root = slf.tax.root();
         let root_idx = slf.tax.to_internal_index(root).unwrap();
@@ -507,6 +488,7 @@ impl PyIterProtocol for Taxonomy {
         })
     }
 }
+
 #[pyclass]
 pub struct TaxonomyIterator {
     t: PyObject,
@@ -514,8 +496,8 @@ pub struct TaxonomyIterator {
     nodes_left: Vec<usize>,
 }
 
-#[pyproto]
-impl PyIterProtocol for TaxonomyIterator {
+#[pymethods]
+impl TaxonomyIterator {
     fn __next__(mut slf: PyRefMut<Self>) -> PyResult<Option<String>> {
         let gil_guard = Python::acquire_gil();
         let py = gil_guard.python();

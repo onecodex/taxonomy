@@ -12,7 +12,7 @@ edition = "2021"
 
 [dependencies]
 memchr = "2.2.1"
-pyo3 = { version = "0.15", optional = true }
+pyo3 = { version = "0.16", optional = true }
 quick-xml = "0.22"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"

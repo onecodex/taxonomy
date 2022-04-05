@@ -13,6 +13,10 @@ use crate::Taxonomy;
 
 #[derive(Eq, PartialEq)]
 pub enum JsonFormat {
+    /// The node link format is made of 2 arrays:
+    /// 1. the nodes with their taxonomic info, in theory sorted by tax id
+    /// 2. the links between each node: a `source` node has a `parent` node.
+    /// The nodes are represented by indices in the nodes array
     NodeLink,
     Tree,
 }
@@ -81,6 +85,7 @@ struct TaxNode {
     #[serde(default = "default_tax_rank")]
     rank: TaxRank,
 
+    /// We want to keep any other fields that was in JSON, they all get put in this hashmap
     #[serde(flatten)]
     extra: HashMap<String, Value>,
 }
@@ -210,6 +215,7 @@ struct TaxNodeTree {
     id: String,
     name: String,
     #[serde(deserialize_with = "deserialize_tax_rank")]
+    #[serde(serialize_with = "serialize_tax_rank")]
     #[serde(default = "default_tax_rank")]
     rank: TaxRank,
     children: Vec<TaxNodeTree>,
