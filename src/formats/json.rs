@@ -218,6 +218,7 @@ struct TaxNodeTree {
     #[serde(serialize_with = "serialize_tax_rank")]
     #[serde(default = "default_tax_rank")]
     rank: TaxRank,
+    #[serde(default)]
     children: Vec<TaxNodeTree>,
 
     #[serde(flatten)]
@@ -432,8 +433,7 @@ mod tests {
                             "id": "562",
                             "name": "Escherichia coli",
                             "rank": "species",
-                            "readcount": 3000,
-                            "children": []
+                            "readcount": 3000
                         }
                     ]
                 }
