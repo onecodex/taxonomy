@@ -167,7 +167,7 @@ pip install .
 maturin build --cargo-extra-args="--features=python" --release --strip
 
 # The linux build is automated through cross-compiling in a docker image
-docker run --rm -v $(pwd):/io konstin2/maturin:master build --cargo-extra-args="--features=python" --release --strip
+docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin build --cargo-extra-args="--features=python" --release --strip
 twine upload target/wheels/*
 ```
 
