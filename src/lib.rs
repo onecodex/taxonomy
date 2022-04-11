@@ -15,3 +15,6 @@ pub use formats::json;
 pub use formats::ncbi;
 pub use formats::newick;
 pub use formats::phyloxml;
+pub use rank::TaxRank;
+pub use errors::Error;
+
