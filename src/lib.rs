@@ -11,10 +11,9 @@ mod taxonomy;
 
 pub use crate::taxonomy::Taxonomy;
 pub use base::GeneralTaxonomy;
+pub use errors::{Error, ErrorKind};
 pub use formats::json;
 pub use formats::ncbi;
 pub use formats::newick;
 pub use formats::phyloxml;
 pub use rank::TaxRank;
-pub use errors::{Error, ErrorKind};
-

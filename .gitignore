@@ -14,3 +14,4 @@ venv/*
 /target
 **/*.rs.bk
 Cargo.lock
+bac120_taxonomy.tsv
