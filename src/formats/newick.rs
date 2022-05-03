@@ -40,7 +40,7 @@ pub fn save<'t, W: Write>(
             out_buf.push_back(NewickToken::Start);
         } else {
             out_buf.push_back(NewickToken::End);
-            let mut name = node.to_owned();
+            let mut name: String = node.split_whitespace().collect();
             if let Some((_, dist)) = taxonomy.parent(node)? {
                 if dist > 0.0 {
                     name.push(':');
