@@ -17,7 +17,6 @@ pub trait Taxonomy<'t> {
     /// This method must return the node itself as the first entry in the list
     /// and the root node as the last entry in the list.
     fn lineage(&'t self, tax_id: &'t str) -> TaxonomyResult<Vec<&'t str>> {
-        // make a vec of parents of id1
         let mut parents = Vec::new();
         let mut last_parent = tax_id;
         parents.push(tax_id);

@@ -66,7 +66,6 @@ where
     } else {
         Ok(TaxRank::Unspecified)
     }
-
 }
 
 fn serialize_tax_rank<S>(x: &TaxRank, s: S) -> Result<S::Ok, S::Error>
@@ -191,17 +190,7 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
         // content
         let fixed_source = idx_mapping_after_sorting[&link.source];
         let fixed_target = idx_mapping_after_sorting[&link.target];
-
         parent_ids[fixed_source] = fixed_target;
-        // parent should always be higher than child in the tree and since we might
-        // have moved things around we need to ensure it stays the case
-        if fixed_target > fixed_source {
-            parent_ids[fixed_target] = fixed_source;
-        } else {
-            parent_ids[fixed_source] = fixed_target;
-        }
-        parent_ids[idx_mapping_after_sorting[&link.source]] =
-            idx_mapping_after_sorting[&link.target];
     }
 
     GeneralTaxonomy::from_arrays(
