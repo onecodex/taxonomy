@@ -57,11 +57,16 @@ fn deserialize_tax_rank<'de, D>(deserializer: D) -> Result<TaxRank, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let s: String = Deserialize::deserialize(deserializer)?;
-    if s.is_empty() {
-        return Ok(TaxRank::Unspecified);
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    if let Some(s) = opt {
+        if s.is_empty() {
+            return Ok(TaxRank::Unspecified);
+        }
+        TaxRank::from_str(&s).map_err(de::Error::custom)
+    } else {
+        Ok(TaxRank::Unspecified)
     }
-    TaxRank::from_str(&s).map_err(de::Error::custom)
+
 }
 
 fn serialize_tax_rank<S>(x: &TaxRank, s: S) -> Result<S::Ok, S::Error>
@@ -459,7 +464,7 @@ mod tests {
         assert!(load(Cursor::new(example), None).is_err());
 
         // rank as a number
-        let example = r#"{"id": "1", "rank": 5}"#;
+        let example = r#"{"id": "1", "rank": 5, "name": ""}"#;
         assert!(load(Cursor::new(example), None).is_err());
     }
 
@@ -584,5 +589,11 @@ mod tests {
         let example = r#"{"test": {"sub": {"nodes": [], "links": []}}}"#;
         let tax = load(Cursor::new(example), Some("/test/sub")).unwrap();
         assert_eq!(tax.len(), 0);
+    }
+
+    #[test]
+    fn can_handle_null_ranks() {
+        let example = r#"{"id": "1", "rank": null, "name": ""}"#;
+        assert!(load(Cursor::new(example), None).is_ok());
     }
 }
