@@ -78,8 +78,6 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
     GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None, None)
 }
 
-/// Only supports dumping with the &str impl as there seems to be no way to specify `T` other
-/// than passing a dummy argument with `impl trait`?
 pub fn save<'t, T: 't, P: AsRef<Path>, X: Taxonomy<'t, T>>(
     tax: &'t X,
     out_dir: P,
