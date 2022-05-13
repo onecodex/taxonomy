@@ -1,19 +1,20 @@
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::ops::Deref;
+use std::str::FromStr;
 
+use pyo3::basic::CompareOp;
 use pyo3::create_exception;
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList, PyType};
 use serde_json::Value;
 
+use crate::base::InternalIndex;
 use crate::json::JsonFormat;
 use crate::rank::TaxRank;
 use crate::Taxonomy as TaxonomyTrait;
-use crate::{json, ncbi, newick, phyloxml, GeneralTaxonomy};
-use pyo3::basic::CompareOp;
-use pyo3::exceptions::PyKeyError;
-use std::ops::Deref;
-use std::str::FromStr;
+use crate::{json, ncbi, newick, phyloxml, prune_away, prune_to, GeneralTaxonomy};
 
 create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::PyException);
 
@@ -119,7 +120,7 @@ pub struct Taxonomy {
 /// Some private fns we don't want to share in Python but that make the Python code easier to
 /// write
 impl Taxonomy {
-    pub(crate) fn get_name(&self, tax_id: &str) -> PyResult<&str> {
+    pub(crate) fn get_name<'t>(&'t self, tax_id: &'t str) -> PyResult<&'t str> {
         let name = py_try!(self.tax.name(tax_id));
         Ok(name)
     }
@@ -139,7 +140,7 @@ impl Taxonomy {
             id: tax_id.to_string(),
             name: name.to_string(),
             rank: rank.to_string(),
-            extra: extra.clone(),
+            extra: (*extra).to_owned(),
             parent,
         })
     }
@@ -202,7 +203,12 @@ impl Taxonomy {
     /// Export a Taxonomy as a JSON-encoded byte string in a tree format
     fn to_json_tree(&self) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
-        py_try!(json::save(&mut bytes, &self.tax, JsonFormat::Tree, None));
+        py_try!(json::save::<_, &str, _>(
+            &mut bytes,
+            &self.tax,
+            JsonFormat::Tree,
+            None
+        ));
         let gil = Python::acquire_gil();
         let py = gil.python();
         Ok(PyBytes::new(py, &bytes).into())
@@ -214,7 +220,7 @@ impl Taxonomy {
     /// Export a Taxonomy as a JSON-encoded byte string in a node link format
     fn to_json_node_links(&self) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
-        py_try!(json::save(
+        py_try!(json::save::<_, &str, _>(
             &mut bytes,
             &self.tax,
             JsonFormat::NodeLink,
@@ -231,7 +237,11 @@ impl Taxonomy {
     /// Export a Taxonomy as a Newick-encoded byte string.
     fn to_newick(&self) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
-        py_try!(newick::save(&mut bytes, &self.tax, Some(self.tax.root())));
+        py_try!(newick::save(
+            &mut bytes,
+            &self.tax,
+            Some(TaxonomyTrait::<InternalIndex>::root(&self.tax))
+        ));
         let gil = Python::acquire_gil();
         let py = gil.python();
         Ok(PyBytes::new(py, &bytes).into())
@@ -375,10 +385,10 @@ impl Taxonomy {
     fn prune(&self, keep: Option<Vec<&str>>, remove: Option<Vec<&str>>) -> PyResult<Taxonomy> {
         let mut tax = self.tax.clone();
         if let Some(k) = keep {
-            tax = py_try!(tax.prune_to(&k, false));
+            tax = py_try!(prune_to(&tax, &k, false));
         }
         if let Some(r) = remove {
-            tax = py_try!(tax.prune_away(&r));
+            tax = py_try!(prune_away(&tax, &r));
         }
         Ok(Taxonomy { tax })
     }
@@ -422,7 +432,7 @@ impl Taxonomy {
             self.tax.names[idx] = n.to_string();
         }
         if let Some(p) = parent_id {
-            if tax_id == self.tax.root() {
+            if tax_id == TaxonomyTrait::<&str>::root(&self.tax) {
                 return Err(PyErr::new::<TaxonomyError, _>("Root cannot have a parent"));
             }
             let parent = py_try!(self.tax.parent(p))
@@ -438,7 +448,7 @@ impl Taxonomy {
         }
 
         if let Some(p) = parent_distance {
-            if tax_id == self.tax.root() {
+            if tax_id == TaxonomyTrait::<&str>::root(&self.tax) {
                 return Err(PyErr::new::<TaxonomyError, _>("Root cannot have a parent"));
             }
             self.tax.parent_distances[idx] = p;
@@ -454,11 +464,14 @@ impl Taxonomy {
     }
 
     fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("<Taxonomy ({} nodes)>", self.tax.len()))
+        Ok(format!(
+            "<Taxonomy ({} nodes)>",
+            TaxonomyTrait::<InternalIndex>::len(&self.tax)
+        ))
     }
 
     fn __len__(&self) -> PyResult<usize> {
-        Ok(self.tax.len())
+        Ok(TaxonomyTrait::<InternalIndex>::len(&self.tax))
     }
 
     // TODO: way to set name and rank
@@ -516,7 +529,7 @@ impl TaxonomyIterator {
                 slf.visited_nodes.pop();
                 slf.nodes_left.pop().unwrap() // postorder
             } else {
-                slf.visited_nodes.push(cur_node.clone());
+                slf.visited_nodes.push(cur_node);
                 let tax: PyRef<Taxonomy> = slf.t.extract(py)?;
                 let cur_node_str = tax.tax.from_internal_index(cur_node).unwrap();
                 let children = tax
@@ -534,7 +547,7 @@ impl TaxonomyIterator {
                 }
                 cur_node // preorder
             };
-            if node_visited == !traverse_preorder {
+            if node_visited != traverse_preorder {
                 let tax: PyRef<Taxonomy> = slf.t.extract(py)?;
                 return Ok(Some(
                     tax.tax
