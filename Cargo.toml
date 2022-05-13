@@ -1,6 +1,6 @@
 [package]
 name = "taxonomy"
-version = "0.8.3"
+version = "0.9.0"
 authors = ["Vincent Prouillet <vincent.prouillet@invitae.com>"]
 description = "Routines for loading, saving, and manipulating taxonomic trees"
 keywords = ["taxonomy", "bioinformatics"]
