@@ -7,10 +7,12 @@ use crate::errors::{Error, ErrorKind, TaxonomyResult};
 use crate::rank::TaxRank;
 use crate::taxonomy::Taxonomy;
 
+pub type InternalIndex = usize;
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct GeneralTaxonomy {
     pub tax_ids: Vec<String>,
-    pub parent_ids: Vec<usize>,
+    pub parent_ids: Vec<InternalIndex>,
     pub parent_distances: Vec<f32>,
     pub names: Vec<String>,
     pub ranks: Vec<TaxRank>,
@@ -18,8 +20,8 @@ pub struct GeneralTaxonomy {
     pub data: Vec<HashMap<String, Value>>,
 
     // these are lookup tables that dramatically speed up some operations
-    pub(crate) tax_id_lookup: HashMap<String, usize>,
-    pub(crate) children_lookup: Vec<Vec<usize>>,
+    pub(crate) tax_id_lookup: HashMap<String, InternalIndex>,
+    pub(crate) children_lookup: Vec<Vec<InternalIndex>>,
 }
 
 impl Default for GeneralTaxonomy {
@@ -104,7 +106,7 @@ impl GeneralTaxonomy {
     }
 
     #[inline]
-    pub(crate) fn to_internal_index(&self, tax_id: &str) -> TaxonomyResult<usize> {
+    pub fn to_internal_index(&self, tax_id: &str) -> TaxonomyResult<InternalIndex> {
         self.tax_id_lookup.get(tax_id).map_or_else(
             || Err(Error::new(ErrorKind::NoSuchTaxId(tax_id.to_owned()))),
             |t| Ok(*t),
@@ -112,7 +114,7 @@ impl GeneralTaxonomy {
     }
 
     #[inline]
-    pub fn from_internal_index(&self, tax_id: usize) -> TaxonomyResult<&str> {
+    pub fn from_internal_index(&self, tax_id: InternalIndex) -> TaxonomyResult<&str> {
         if tax_id >= self.tax_ids.len() {
             return Err(Error::new(ErrorKind::NoSuchTaxId(format!(
                 "Internal ID: {}",
@@ -124,7 +126,7 @@ impl GeneralTaxonomy {
 
     pub fn from_arrays(
         tax_ids: Vec<String>,
-        parent_ids: Vec<usize>,
+        parent_ids: Vec<InternalIndex>,
         names: Option<Vec<String>>,
         ranks: Option<Vec<TaxRank>>,
         distances: Option<Vec<f32>>,
