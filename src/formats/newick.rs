@@ -6,6 +6,7 @@ use crate::Taxonomy;
 
 use memchr::memchr2;
 use std::collections::VecDeque;
+use std::fmt::{Debug, Display};
 
 /// NewickToken is used as an intermediate during the tokenization of a Newick string.
 #[derive(PartialEq)]
@@ -27,11 +28,14 @@ impl NewickToken {
     }
 }
 
-pub fn save<'t, W: Write>(
+pub fn save<'t, T: 't, W: Write>(
     writer: &mut W,
-    taxonomy: &'t impl Taxonomy<'t>,
-    root_node: Option<&str>,
-) -> TaxonomyResult<()> {
+    taxonomy: &'t impl Taxonomy<'t, T>,
+    root_node: Option<T>,
+) -> TaxonomyResult<()>
+where
+    T: Clone + Debug + Display + PartialEq,
+{
     let root_node = root_node.unwrap_or_else(|| taxonomy.root());
     let mut out_buf = VecDeque::new();
 
@@ -40,7 +44,7 @@ pub fn save<'t, W: Write>(
             out_buf.push_back(NewickToken::Start);
         } else {
             out_buf.push_back(NewickToken::End);
-            let mut name = node.to_owned();
+            let mut name: String = format!("{}", node);
             if let Some((_, dist)) = taxonomy.parent(node)? {
                 if dist > 0.0 {
                     name.push(':');
@@ -178,11 +182,11 @@ mod tests {
     fn test_load_newick() {
         let newick_str = b"(())";
         let tax = load(&mut newick_str.as_ref()).unwrap();
-        assert_eq!(tax.len(), 3);
+        assert_eq!(Taxonomy::<&str>::len(&tax), 3);
 
         let newick_str = b"(A,B,(C,D));";
         let tax = load(&mut newick_str.as_ref()).unwrap();
-        assert_eq!(tax.len(), 6);
+        assert_eq!(Taxonomy::<&str>::len(&tax), 6);
 
         let newick_str = b"(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;";
         let tax = load(&mut newick_str.as_ref()).unwrap();

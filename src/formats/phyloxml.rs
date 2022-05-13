@@ -193,7 +193,7 @@ mod test {
         "#;
         let mut text_cursor = Cursor::new(text_xml);
         let tax = load(&mut text_cursor).unwrap();
-        assert_eq!(tax.len(), 5);
+        assert_eq!(Taxonomy::<&str>::len(&tax), 5);
 
         let text_xml = r#"
         <phylogeny rooted="true">
@@ -215,7 +215,7 @@ mod test {
         "#;
         let mut text_cursor = Cursor::new(text_xml);
         let tax = load(&mut text_cursor).unwrap();
-        assert_eq!(tax.len(), 5);
+        assert_eq!(Taxonomy::<&str>::len(&tax), 5);
     }
 
     #[test]
