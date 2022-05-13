@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Debug, Display};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 use std::str::FromStr;
@@ -77,22 +78,32 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
     GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None, None)
 }
 
-pub fn save<'t, P: AsRef<Path>>(tax: &'t impl Taxonomy<'t>, out_dir: P) -> TaxonomyResult<()> {
+/// Only supports dumping with the &str impl as there seems to be no way to specify `T` other
+/// than passing a dummy argument with `impl trait`?
+pub fn save<'t, T: 't, P: AsRef<Path>, X: Taxonomy<'t, T>>(
+    tax: &'t X,
+    out_dir: P,
+) -> TaxonomyResult<()>
+where
+    T: Clone + Debug + Display + PartialEq,
+{
     let dir = out_dir.as_ref();
     std::fs::create_dir_all(&dir)?;
     let mut node_writer = BufWriter::new(std::fs::File::create(dir.join(NODES_FILENAME))?);
     let mut name_writer = BufWriter::new(std::fs::File::create(dir.join(NAMES_FILENAME))?);
 
     for key in tax.traverse(tax.root())?.filter(|x| x.1).map(|x| x.0) {
-        let name = tax.name(key)?;
-        let rank = tax.rank(key)?;
+        let name = tax.name(key.clone())?;
+        let rank = tax.rank(key.clone())?;
         name_writer
             .write_all(format!("{}\t|\t{}\t|\tscientific name\t|", &key, name).as_bytes())?;
         node_writer.write_all(
             format!(
                 "{}\t|\t{}\t|\t{}\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|",
                 &key,
-                tax.parent(key)?.map(|x| x.0.to_owned()).unwrap_or_default(),
+                tax.parent(key.clone())?
+                    .map(|(x, _)| format!("{}", x))
+                    .unwrap_or_default(),
                 rank.to_ncbi_rank(),
             )
             .as_bytes(),
@@ -180,12 +191,24 @@ mod tests {
         writeln!(names_file, "{}", names).unwrap();
 
         let tax = load(path).unwrap();
-        assert_eq!(tax.name("562").unwrap(), "Escherichia coli");
-        assert_eq!(tax.rank("562").unwrap(), TaxRank::Species);
-        assert_eq!(tax.parent("562").unwrap(), Some(("561", 1.)));
-        assert_eq!(tax.children("561").unwrap(), vec!["562"]);
+        assert_eq!(
+            Taxonomy::<&str>::name(&tax, "562").unwrap(),
+            "Escherichia coli"
+        );
+        assert_eq!(
+            Taxonomy::<&str>::rank(&tax, "562").unwrap(),
+            TaxRank::Species
+        );
+        assert_eq!(
+            Taxonomy::<&str>::children(&tax, "561").unwrap(),
+            vec!["562"]
+        );
+        assert_eq!(
+            Taxonomy::<&str>::parent(&tax, "562").unwrap(),
+            Some(("561", 1.))
+        );
 
         let out = path.join("out");
-        save(&tax, &out).unwrap();
+        save::<&str, _, _>(&tax, &out).unwrap();
     }
 }
