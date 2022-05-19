@@ -101,13 +101,9 @@ where
     /// Returns the taxonomic rank of the tax_id provided.
     fn rank(&'t self, tax_id: T) -> TaxonomyResult<TaxRank>;
 
-    // /// Used by traverse, to grab the internal tax id for the given tax id. Only there
-    // /// for lifetime reasons. Raise an error if not found.
-    // fn get_internal_tax_id(&'t self, node: T) -> TaxonomyResult<T>;
-
     /// Generates an iterator that traces over the entire taxonomic tree from the given node. During
-    /// preorder traversal, it returns `(&str, true)` and during postorder traversal
-    /// it returns `(&str, false)`
+    /// preorder traversal, it returns `(T, true)` and during postorder traversal
+    /// it returns `(T, false)`
     fn traverse(&'t self, node: T) -> TaxonomyResult<TaxonomyIterator<'t, T>>
     where
         Self: Sized,

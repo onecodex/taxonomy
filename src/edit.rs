@@ -35,7 +35,7 @@ pub fn prune_away<'t, T: 't + Clone + Copy + Debug + Display + Eq + Hash + Parti
             if pre {
                 new_ids.push(node.to_string());
                 parent_ids.push(cur_lineage.last().map(|x| x - 1).unwrap_or(0));
-                dists.push(tax.parent(node)?.map(|x| x.1).unwrap_or(0.));
+                dists.push(tax.parent(node)?.map(|x| x.1).unwrap_or(0.0));
                 names.push(tax.name(node)?.to_string());
                 ranks.push(tax.rank(node)?);
                 data.push((*tax.data(node)?).to_owned());
@@ -97,7 +97,7 @@ where
             if good_ids.contains(&node) {
                 new_ids.push(node.to_string());
                 parent_ids.push(cur_lineage.last().map(|x| x - 1).unwrap_or(0));
-                dists.push(tax.parent(node)?.map(|x| x.1).unwrap_or(0.));
+                dists.push(tax.parent(node)?.map(|x| x.1).unwrap_or(0.0));
                 names.push(tax.name(node)?.to_string());
                 ranks.push(tax.rank(node)?);
                 data.push((*tax.data(node)?).to_owned());
