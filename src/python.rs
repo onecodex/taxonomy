@@ -107,6 +107,13 @@ impl TaxonomyNode {
             }
         }
     }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "<TaxonomyNode (id=\"{}\" rank=\"{}\" name=\"{}\"))>",
+            self.rank, self.rank, self.name
+        ))
+    }
 }
 
 /// The Taxonomy object provides the primary interface for exploring a
