@@ -206,6 +206,10 @@ class NCBITestCase(unittest.TestCase):
         node, distance = tax.parent_with_distance("562")
         self.assertEqual(distance, 3)
 
+    def test_repr(self):
+        tax = self._create_tax()
+        self.assertEqual(tax["562"].__repr__(), "<TaxonomyNode (id=\"species\" rank=\"species\" name=\"Escherichia coli\"))>")
+
 
 if __name__ == '__main__':
     unittest.main()
