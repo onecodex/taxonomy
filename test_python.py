@@ -211,8 +211,11 @@ class NCBITestCase(unittest.TestCase):
 
     def test_repr(self):
         tax = self._create_tax()
-        self.assertEqual(tax["562"].__repr__(), "<TaxonomyNode (id=\"species\" rank=\"species\" name=\"Escherichia coli\"))>")
+        self.assertEqual(
+            tax["562"].__repr__(),
+            '<TaxonomyNode (id="562" rank="species" name="Escherichia coli"))>',
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
