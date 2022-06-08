@@ -111,7 +111,7 @@ impl TaxonomyNode {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "<TaxonomyNode (id=\"{}\" rank=\"{}\" name=\"{}\"))>",
-            self.rank, self.rank, self.name
+            self.id, self.rank, self.name
         ))
     }
 }
