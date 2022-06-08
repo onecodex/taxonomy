@@ -199,6 +199,9 @@ class NCBITestCase(unittest.TestCase):
         tax.add_node("561", "563")
         node = tax["563"]
         self.assertEqual(node.parent, "561")
+        tax.add_node("563", "100000001")
+        node = tax["100000001"]
+        self.assertEqual(node.parent, "563")
 
     def test_edit_node(self):
         tax = self._create_tax()
