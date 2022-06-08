@@ -213,7 +213,7 @@ class NCBITestCase(unittest.TestCase):
         tax = self._create_tax()
         self.assertEqual(
             tax["562"].__repr__(),
-            '<TaxonomyNode (id="562" rank="species" name="Escherichia coli"))>',
+            '<TaxonomyNode (id="562" rank="species" name="Escherichia coli")>',
         )
 
 
