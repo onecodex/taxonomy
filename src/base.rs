@@ -196,7 +196,6 @@ impl GeneralTaxonomy {
     /// Add a new node to the taxonomy.
     pub fn add(&mut self, parent_id: &str, tax_id: &str) -> TaxonomyResult<()> {
         let parent_idx = self.to_internal_index(parent_id)?;
-        let new_idx = self.tax_ids.len();
         self.tax_ids.push(tax_id.to_string());
         self.parent_ids.push(parent_idx);
         self.parent_distances.push(1.0);
@@ -205,8 +204,8 @@ impl GeneralTaxonomy {
         self.data.push(HashMap::new());
 
         // update the cached lookup tables
-        self.tax_id_lookup.insert(tax_id.to_string(), new_idx);
-        self.children_lookup[parent_idx].push(new_idx);
+        self.index();
+        self.validate()?;
 
         Ok(())
     }
