@@ -209,6 +209,12 @@ class NCBITestCase(unittest.TestCase):
         node, distance = tax.parent_with_distance("562")
         self.assertEqual(distance, 3)
 
+    def test_edit_node_parent(self):
+        tax = self._create_tax()
+        self.assertEqual(tax["562"].parent, "561")
+        tax.edit_node('562', parent_id='1')
+        self.assertEqual(tax["562"].parent, "1")
+
     def test_repr(self):
         tax = self._create_tax()
         self.assertEqual(

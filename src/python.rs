@@ -442,16 +442,13 @@ impl Taxonomy {
             if tax_id == TaxonomyTrait::<&str>::root(&self.tax) {
                 return Err(PyErr::new::<TaxonomyError, _>("Root cannot have a parent"));
             }
-            let parent = py_try!(self.tax.parent(p))
-                .ok_or_else(|| PyErr::new::<PyKeyError, _>("New parent ID is not in taxonomy"))?
-                .0;
-            let lineage = py_try!(self.tax.lineage(parent), "New parent has bad lineage?");
+            let lineage = py_try!(self.tax.lineage(p), "New parent has bad lineage?");
             if lineage.contains(&tax_id) {
                 return Err(PyErr::new::<TaxonomyError, _>(
                     "Node can not be moved to its child",
                 ));
             }
-            self.tax.parent_ids[idx] = py_try!(self.tax.to_internal_index(parent));
+            self.tax.parent_ids[idx] = py_try!(self.tax.to_internal_index(p));
         }
 
         if let Some(p) = parent_distance {
