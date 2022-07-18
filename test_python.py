@@ -100,6 +100,10 @@ class NewickTestCase(unittest.TestCase):
         node = tax["G"]
         self.assertEqual(node.parent, "D")
 
+        tax.add_node("G", "H")
+        node = tax["H"]
+        self.assertEqual(node.parent, "H")
+
     def test_edit_node(self):
         tax = self._create_tax()
         tax.edit_node("D", parent_distance=3)
