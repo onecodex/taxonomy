@@ -61,6 +61,7 @@ impl GeneralTaxonomy {
         for v in self.children_lookup.iter_mut() {
             v.clear();
         }
+
         if self.children_lookup.len() != self.tax_ids.len() {
             self.children_lookup.resize(self.tax_ids.len(), Vec::new());
         }
@@ -196,6 +197,8 @@ impl GeneralTaxonomy {
     /// Add a new node to the taxonomy.
     pub fn add(&mut self, parent_id: &str, tax_id: &str) -> TaxonomyResult<()> {
         let parent_idx = self.to_internal_index(parent_id)?;
+        let new_idx = self.tax_ids.len();
+
         self.tax_ids.push(tax_id.to_string());
         self.parent_ids.push(parent_idx);
         self.parent_distances.push(1.0);
@@ -204,8 +207,13 @@ impl GeneralTaxonomy {
         self.data.push(HashMap::new());
 
         // update the cached lookup tables
-        self.index();
-        self.validate()?;
+        self.tax_id_lookup.insert(tax_id.to_string(), new_idx);
+
+        if self.children_lookup.len() != self.tax_ids.len() {
+            self.children_lookup.resize(self.tax_ids.len(), Vec::new());
+        }
+
+        self.children_lookup[parent_idx].push(new_idx);
 
         Ok(())
     }
@@ -423,6 +431,17 @@ mod tests {
         assert_eq!(Taxonomy::<&str>::len(&tax), tax_size + 1);
         assert_eq!(tax.parent("200").unwrap(), Some(("2", 1.0)));
         assert_eq!(tax.lineage("200").unwrap(), vec!["200", "2", "1"]);
+
+        // parent_id, tax_id
+        //
+        // make sure we can continue to add nodes aftewards
+        //
+        let tax_size = Taxonomy::<&str>::len(&tax);
+        tax.add("200", "1024").unwrap();
+
+        assert_eq!(Taxonomy::<&str>::len(&tax), tax_size + 1);
+        assert_eq!(tax.parent("1024").unwrap(), Some(("200", 1.0)));
+        assert_eq!(tax.lineage("1024").unwrap(), vec!["1024", "200", "2", "1"]);
     }
 
     #[test]
