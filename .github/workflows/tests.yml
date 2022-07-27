@@ -52,7 +52,6 @@ jobs:
           pip3 install maturin
           pip3 show maturin
 
-
       - name: add library to venv
         run: |
           . venv/bin/activate

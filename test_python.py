@@ -102,7 +102,7 @@ class NewickTestCase(unittest.TestCase):
 
         tax.add_node("G", "H")
         node = tax["H"]
-        self.assertEqual(node.parent, "H")
+        self.assertEqual(node.parent, "G")
 
     def test_edit_node(self):
         tax = self._create_tax()
