@@ -48,7 +48,7 @@ where
             if let Some((_, dist)) = taxonomy.parent(node)? {
                 if dist > 0.0 {
                     name.push(':');
-                    name.push_str(&format!("{}", dist));
+                    name.push_str(&dist.to_string());
                 }
             }
             out_buf.push_back(NewickToken::NameDist(name));
