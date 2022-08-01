@@ -100,6 +100,10 @@ class NewickTestCase(unittest.TestCase):
         node = tax["G"]
         self.assertEqual(node.parent, "D")
 
+        tax.add_node("G", "H")
+        node = tax["H"]
+        self.assertEqual(node.parent, "G")
+
     def test_edit_node(self):
         tax = self._create_tax()
         tax.edit_node("D", parent_distance=3)
@@ -199,6 +203,9 @@ class NCBITestCase(unittest.TestCase):
         tax.add_node("561", "563")
         node = tax["563"]
         self.assertEqual(node.parent, "561")
+        tax.add_node("563", "100000001")
+        node = tax["100000001"]
+        self.assertEqual(node.parent, "563")
 
     def test_edit_node(self):
         tax = self._create_tax()
@@ -206,6 +213,19 @@ class NCBITestCase(unittest.TestCase):
         node, distance = tax.parent_with_distance("562")
         self.assertEqual(distance, 3)
 
+    def test_edit_node_parent(self):
+        tax = self._create_tax()
+        self.assertEqual(tax["562"].parent, "561")
+        tax.edit_node('562', parent_id='1')
+        self.assertEqual(tax["562"].parent, "1")
 
-if __name__ == '__main__':
+    def test_repr(self):
+        tax = self._create_tax()
+        self.assertEqual(
+            tax["562"].__repr__(),
+            '<TaxonomyNode (id="562" rank="species" name="Escherichia coli")>',
+        )
+
+
+if __name__ == "__main__":
     unittest.main()

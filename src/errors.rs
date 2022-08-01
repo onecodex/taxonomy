@@ -1,3 +1,4 @@
+use crate::base::InternalIndex;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -6,6 +7,7 @@ pub enum ErrorKind {
     ImportError { line: usize, msg: String },
     InvalidTaxonomy(String),
     NoSuchTaxId(String),
+    NoSuchInternalIndex(InternalIndex),
     OperationNotAllowed(String),
 }
 
@@ -25,6 +27,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             ErrorKind::NoSuchTaxId(s) => write!(f, "Tax ID {} not found in taxonomy", s),
+            ErrorKind::NoSuchInternalIndex(s) => write!(f, "Index {} not found in taxonomy", s),
             ErrorKind::UnknownRank(r) => write!(f, "Rank {} is unknown", r),
             ErrorKind::ImportError { line, msg } => {
                 write!(f, "Failed to import taxonomy {} at line {}", msg, line)

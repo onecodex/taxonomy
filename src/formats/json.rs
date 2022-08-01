@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
 use std::io::{Read, Write};
 use std::str::FromStr;
 
@@ -57,11 +59,15 @@ fn deserialize_tax_rank<'de, D>(deserializer: D) -> Result<TaxRank, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let s: String = Deserialize::deserialize(deserializer)?;
-    if s.is_empty() {
-        return Ok(TaxRank::Unspecified);
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    if let Some(s) = opt {
+        if s.is_empty() {
+            return Ok(TaxRank::Unspecified);
+        }
+        TaxRank::from_str(&s).map_err(de::Error::custom)
+    } else {
+        Ok(TaxRank::Unspecified)
     }
-    TaxRank::from_str(&s).map_err(de::Error::custom)
 }
 
 fn serialize_tax_rank<S>(x: &TaxRank, s: S) -> Result<S::Ok, S::Error>
@@ -186,17 +192,7 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
         // content
         let fixed_source = idx_mapping_after_sorting[&link.source];
         let fixed_target = idx_mapping_after_sorting[&link.target];
-
         parent_ids[fixed_source] = fixed_target;
-        // parent should always be higher than child in the tree and since we might
-        // have moved things around we need to ensure it stays the case
-        if fixed_target > fixed_source {
-            parent_ids[fixed_target] = fixed_source;
-        } else {
-            parent_ids[fixed_source] = fixed_target;
-        }
-        parent_ids[idx_mapping_after_sorting[&link.source]] =
-            idx_mapping_after_sorting[&link.target];
     }
 
     GeneralTaxonomy::from_arrays(
@@ -297,12 +293,15 @@ pub fn load<R: Read>(reader: R, json_pointer: Option<&str>) -> TaxonomyResult<Ge
     }
 }
 
-pub fn save<W: Write>(
+pub fn save<'t, W: Write, T: 't, X: Taxonomy<'t, T>>(
     writer: W,
-    taxonomy: &GeneralTaxonomy,
+    taxonomy: &'t X,
     format: JsonFormat,
-    root_node: Option<&str>,
-) -> TaxonomyResult<()> {
+    root_node: Option<T>,
+) -> TaxonomyResult<()>
+where
+    T: Clone + Debug + Display + Eq + Hash + PartialEq,
+{
     let root_node = root_node.unwrap_or_else(|| taxonomy.root());
     let json_data = match format {
         JsonFormat::NodeLink => serialize_as_node_links(taxonomy, root_node),
@@ -313,18 +312,27 @@ pub fn save<W: Write>(
     Ok(())
 }
 
-fn serialize_as_tree(taxonomy: &GeneralTaxonomy, tax_id: &str) -> TaxonomyResult<Value> {
-    fn inner(tax: &GeneralTaxonomy, tax_id: &str) -> TaxonomyResult<TaxNodeTree> {
+fn serialize_as_tree<'t, T: 't>(
+    taxonomy: &'t impl Taxonomy<'t, T>,
+    tax_id: T,
+) -> TaxonomyResult<Value>
+where
+    T: Clone + Debug + Display + Eq + Hash + PartialEq,
+{
+    fn inner<'t, T: 't>(tax: &'t impl Taxonomy<'t, T>, tax_id: T) -> TaxonomyResult<TaxNodeTree>
+    where
+        T: Clone + Debug + Display + Eq + Hash + PartialEq,
+    {
         let mut children = Vec::new();
-        for child in tax.children(tax_id)? {
+        for child in tax.children(tax_id.clone())? {
             children.push(inner(tax, child)?);
         }
         let node = TaxNodeTree {
-            id: tax_id.to_owned(),
-            name: tax.name(tax_id)?.to_owned(),
-            rank: tax.rank(tax_id)?,
+            id: tax_id.to_string(),
+            name: tax.name(tax_id.clone())?.to_string(),
+            rank: tax.rank(tax_id.clone())?,
             children,
-            extra: tax.data(tax_id)?.clone(),
+            extra: (*tax.data(tax_id)?).clone(),
         };
         Ok(node)
     }
@@ -332,21 +340,27 @@ fn serialize_as_tree(taxonomy: &GeneralTaxonomy, tax_id: &str) -> TaxonomyResult
     Ok(to_value(inner(taxonomy, tax_id)?)?)
 }
 
-fn serialize_as_node_links(taxonomy: &GeneralTaxonomy, root_id: &str) -> TaxonomyResult<Value> {
+fn serialize_as_node_links<'t, T: 't>(
+    tax: &'t impl Taxonomy<'t, T>,
+    root_id: T,
+) -> TaxonomyResult<Value>
+where
+    T: Clone + Debug + Display + Eq + Hash + PartialEq,
+{
     let mut nodes = Vec::new();
     let mut links = Vec::new();
     let mut id_to_idx = HashMap::new();
 
-    for (ix, (tid, _pre)) in taxonomy.traverse(root_id)?.filter(|x| x.1).enumerate() {
+    for (ix, (tid, _pre)) in tax.traverse(root_id)?.filter(|x| x.1).enumerate() {
         let node = TaxNode {
-            id: tid.to_owned(),
-            name: taxonomy.name(tid)?.to_owned(),
-            rank: taxonomy.rank(tid)?,
-            extra: taxonomy.data(tid)?.clone(),
+            id: tid.to_string(),
+            name: tax.name(tid.clone())?.to_string(),
+            rank: tax.rank(tid.clone())?,
+            extra: (*tax.data(tid.clone())?).clone(),
         };
         nodes.push(to_value(&node).unwrap());
-        id_to_idx.insert(tid, ix);
-        if let Some(parent_id) = taxonomy.parent(tid)? {
+        id_to_idx.insert(tid.clone(), ix);
+        if let Some(parent_id) = tax.parent(tid)? {
             links.push(json!({
                 "source": ix,
                 "target": id_to_idx[&parent_id.0],
@@ -376,7 +390,7 @@ mod tests {
     fn can_load_empty_node_link_format() {
         let example = r#"{"nodes": [], "links": []}"#;
         let tax = load(Cursor::new(example), None).unwrap();
-        assert_eq!(tax.len(), 0);
+        assert_eq!(Taxonomy::<&str>::len(&tax), 0);
     }
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -399,20 +413,36 @@ mod tests {
             ]
         }"#;
         let tax = load(Cursor::new(example), None).unwrap();
-        assert_eq!(tax.len(), 3);
-        assert_eq!(tax.root(), "1");
-        assert_eq!(tax.children("1").unwrap(), vec!["2"]);
-        assert_eq!(tax.lineage("562").unwrap(), vec!["562", "2", "1"]);
-        assert_eq!(tax.data("1").unwrap()["readcount"].as_i64().unwrap(), 1000);
+        assert_eq!(Taxonomy::<&str>::len(&tax), 3);
+        assert_eq!(Taxonomy::<&str>::root(&tax), "1");
+        assert_eq!(Taxonomy::<&str>::children(&tax, "1").unwrap(), vec!["2"]);
+        assert_eq!(
+            Taxonomy::<&str>::lineage(&tax, "562").unwrap(),
+            vec!["562", "2", "1"]
+        );
+        assert_eq!(
+            Taxonomy::<&str>::data(&tax, "1").unwrap()["readcount"]
+                .as_i64()
+                .unwrap(),
+            1000
+        );
         // Converting to Value should give us the same data
-        let serialized = serialize_as_node_links(&tax, tax.root()).unwrap();
+        let serialized = serialize_as_node_links(&tax, Taxonomy::<&str>::root(&tax)).unwrap();
 
         let tax2 = load_node_link_json(&serialized).unwrap();
-        assert_eq!(tax2.len(), 3);
-        assert_eq!(tax2.root(), "1");
-        assert_eq!(tax2.children("1").unwrap(), vec!["2"]);
-        assert_eq!(tax2.lineage("562").unwrap(), vec!["562", "2", "1"]);
-        assert_eq!(tax2.data("1").unwrap()["readcount"].as_i64().unwrap(), 1000);
+        assert_eq!(Taxonomy::<&str>::len(&tax2), 3);
+        assert_eq!(Taxonomy::<&str>::root(&tax2), "1");
+        assert_eq!(Taxonomy::<&str>::children(&tax2, "1").unwrap(), vec!["2"]);
+        assert_eq!(
+            Taxonomy::<&str>::lineage(&tax2, "562").unwrap(),
+            vec!["562", "2", "1"]
+        );
+        assert_eq!(
+            Taxonomy::<&str>::data(&tax2, "1").unwrap()["readcount"]
+                .as_i64()
+                .unwrap(),
+            1000
+        );
     }
 
     #[test]
@@ -441,13 +471,21 @@ mod tests {
         }"#;
 
         let tax = load(Cursor::new(example), None).unwrap();
-        assert_eq!(tax.len(), 3);
-        assert_eq!(tax.root(), "1");
-        assert_eq!(tax.children("1").unwrap(), vec!["2"]);
-        assert_eq!(tax.lineage("562").unwrap(), vec!["562", "2", "1"]);
-        assert_eq!(tax.data("1").unwrap()["readcount"].as_i64().unwrap(), 1000);
+        assert_eq!(Taxonomy::<&str>::len(&tax), 3);
+        assert_eq!(Taxonomy::<&str>::root(&tax), "1");
+        assert_eq!(Taxonomy::<&str>::children(&tax, "1").unwrap(), vec!["2"]);
+        assert_eq!(
+            Taxonomy::<&str>::lineage(&tax, "562").unwrap(),
+            vec!["562", "2", "1"]
+        );
+        assert_eq!(
+            Taxonomy::<&str>::data(&tax, "1").unwrap()["readcount"]
+                .as_i64()
+                .unwrap(),
+            1000
+        );
         // Converting to Value should give us the same data
-        let serialized = serialize_as_tree(&tax, tax.root()).unwrap();
+        let serialized = serialize_as_tree(&tax, Taxonomy::<&str>::root(&tax)).unwrap();
         let input_val: TaxNodeTree = from_str(&example).unwrap();
         assert_eq!(serialized, to_value(&input_val).unwrap());
     }
@@ -459,7 +497,7 @@ mod tests {
         assert!(load(Cursor::new(example), None).is_err());
 
         // rank as a number
-        let example = r#"{"id": "1", "rank": 5}"#;
+        let example = r#"{"id": "1", "rank": 5, "name": ""}"#;
         assert!(load(Cursor::new(example), None).is_err());
     }
 
@@ -571,10 +609,10 @@ mod tests {
   ]
 }        "#;
         let tax = load(Cursor::new(example), None).unwrap();
-        assert_eq!(tax.len(), 11);
-        assert_eq!(tax.root(), "1");
+        assert_eq!(Taxonomy::<&str>::len(&tax), 11);
+        assert_eq!(Taxonomy::<&str>::root(&tax), "1");
         assert_eq!(
-            tax.lineage("10").unwrap(),
+            Taxonomy::<&str>::lineage(&tax, "10").unwrap(),
             vec!["10", "8", "7", "6", "5", "4", "3", "2", "1"]
         );
     }
@@ -583,6 +621,12 @@ mod tests {
     fn can_load_from_json_path() {
         let example = r#"{"test": {"sub": {"nodes": [], "links": []}}}"#;
         let tax = load(Cursor::new(example), Some("/test/sub")).unwrap();
-        assert_eq!(tax.len(), 0);
+        assert_eq!(Taxonomy::<&str>::len(&tax), 0);
+    }
+
+    #[test]
+    fn can_handle_null_ranks() {
+        let example = r#"{"id": "1", "rank": null, "name": ""}"#;
+        assert!(load(Cursor::new(example), None).is_ok());
     }
 }
