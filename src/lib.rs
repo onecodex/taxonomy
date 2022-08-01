@@ -14,6 +14,7 @@ pub use crate::taxonomy::Taxonomy;
 pub use base::GeneralTaxonomy;
 pub use edit::{prune_away, prune_to};
 pub use errors::{Error, ErrorKind};
+pub use formats::gtdb;
 pub use formats::json;
 pub use formats::ncbi;
 pub use formats::newick;

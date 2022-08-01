@@ -1,29 +1,31 @@
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{BufRead, BufReader, Read};
 
 use crate::base::GeneralTaxonomy;
-use crate::errors::TaxonomyResult;
+use crate::errors::{Error, ErrorKind, TaxonomyResult};
 use crate::rank::TaxRank;
-use crate::taxonomy::Taxonomy;
 
-// TODO: load from file or str? or both?
-pub fn load(data: &str) -> TaxonomyResult<GeneralTaxonomy> {
-    // no distance, no tax id
-
-    // Should use a linked hashset for more efficient contains
-    let mut tax_ids = Vec::new();
+/// Read GTDB format into a Taxonomy object out of a `reader`.
+///
+/// Still somewhat experimental and may not support all GTDB features.
+pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
     let mut tax_names = Vec::new();
     let mut tax_names_idx = HashMap::new();
     let mut parent_ids = Vec::new();
     let mut tax_ranks = Vec::new();
 
-    for row in data.lines() {
+    for (line_num, row_result) in BufReader::new(reader).lines().enumerate() {
+        let row = row_result?;
         // parts[0] -> accession number
         // parts[1] -> lineage, `;` separated
         let parts: Vec<_> = row.split('\t').collect();
-        assert_eq!(parts.len(), 2);
-        let accession_number = parts[0];
-        tax_ids.push(accession_number.to_string());
+        if parts.len() != 2 {
+            return Err(Error::new(ErrorKind::ImportError {
+                line: line_num,
+                msg: "Expected tab-delimited line with exactly two parts (accession and lineage)"
+                    .to_owned(),
+            }));
+        }
         let lineage: Vec<_> = parts[1].split(';').collect();
 
         for (i, level) in lineage.iter().enumerate() {
@@ -52,7 +54,6 @@ pub fn load(data: &str) -> TaxonomyResult<GeneralTaxonomy> {
             }
         }
     }
-    // println!("{:?}", tax_names);
 
     GeneralTaxonomy::from_arrays(
         tax_names.clone(),
@@ -67,14 +68,45 @@ pub fn load(data: &str) -> TaxonomyResult<GeneralTaxonomy> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::taxonomy::Taxonomy;
+    use std::fs::File;
 
     #[test]
     fn can_load_gtdb_format() {
-        let data = std::fs::read_to_string("tests/data/gtdb_sample.tsv").unwrap();
-        let tax = load(&data).unwrap();
+        let mut file = File::open("tests/data/gtdb_sample.tsv").unwrap();
+        let tax = load(&mut file).unwrap();
 
-        let lineage = tax.lineage("s__Escherichia coli").unwrap();
-        println!("{:?}", lineage);
-        assert!(false);
+        let mut tax_id = "d__Bacteria";
+        assert_eq!(tax.rank(tax_id).unwrap(), TaxRank::Domain);
+        assert_eq!(tax.parent(tax_id).unwrap(), None);
+        assert_eq!(tax.lineage(tax_id).unwrap(), ["d__Bacteria"]);
+
+        tax_id = "c__Bacilli";
+        assert_eq!(tax.rank(tax_id).unwrap(), TaxRank::Class);
+        assert_eq!(
+            tax.lineage(tax_id).unwrap(),
+            ["c__Bacilli", "p__Firmicutes", "d__Bacteria"]
+        );
+
+        tax_id = "s__Escherichia coli";
+        assert_eq!(tax.rank(tax_id).unwrap(), TaxRank::Species);
+        assert_eq!(
+            tax.lineage(tax_id).unwrap(),
+            [
+                "s__Escherichia coli",
+                "g__Escherichia",
+                "f__Enterobacteriaceae",
+                "o__Enterobacterales",
+                "c__Gammaproteobacteria",
+                "p__Proteobacteria",
+                "d__Bacteria"
+            ]
+        );
+    }
+
+    #[test]
+    fn invalid_gtdb_format() {
+        let mut file = File::open("tests/data/gtdb_invalid.tsv").unwrap();
+        assert!(load(&mut file).is_err());
     }
 }
