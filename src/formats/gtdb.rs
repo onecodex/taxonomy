@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
 
-use crate::base::GeneralTaxonomy;
+use crate::base::{GeneralTaxonomy, InternalIndex};
 use crate::errors::{Error, ErrorKind, TaxonomyResult};
 use crate::rank::TaxRank;
 
@@ -10,11 +10,13 @@ use crate::rank::TaxRank;
 /// Still somewhat experimental and may not support all GTDB features.
 pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
     let mut tax_names = Vec::new();
-    let mut tax_names_idx = HashMap::new();
+    // Maps tax name to (index, lineage prefix)
+    let mut tax_names_idx: HashMap<String, (InternalIndex, String)> = HashMap::new();
     let mut parent_ids = Vec::new();
     let mut tax_ranks = Vec::new();
 
-    for (line_num, row_result) in BufReader::new(reader).lines().enumerate() {
+    for (row_idx, row_result) in BufReader::new(reader).lines().enumerate() {
+        let line_num = row_idx + 1;
         let row = row_result?;
         // parts[0] -> accession number
         // parts[1] -> lineage, `;` separated
@@ -29,28 +31,42 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
         let lineage: Vec<_> = parts[1].split(';').collect();
 
         for (i, level) in lineage.iter().enumerate() {
-            if tax_names_idx.contains_key(*level) {
-                continue;
-            }
-            let tax_rank = match &level[..3] {
-                "d__" => TaxRank::Domain,
-                "p__" => TaxRank::Phylum,
-                "c__" => TaxRank::Class,
-                "o__" => TaxRank::Order,
-                "f__" => TaxRank::Family,
-                "g__" => TaxRank::Genus,
-                "s__" => TaxRank::Species,
-                _ => TaxRank::Unspecified,
-            };
-            tax_names.push(level.to_string());
-            tax_ranks.push(tax_rank);
-            let idx = tax_names.len() - 1;
-            tax_names_idx.insert(level.to_string(), idx);
-            if i > 0 {
-                let parent_id = tax_names_idx.get(lineage[i - 1]).unwrap();
-                parent_ids.push(*parent_id);
-            } else {
-                parent_ids.push(0);
+            let curr_prefix = lineage[..i].join(";");
+            match tax_names_idx.get(*level) {
+                Some((_, prev_prefix)) => {
+                    if curr_prefix != *prev_prefix {
+                        return Err(Error::new(ErrorKind::ImportError {
+                            line: line_num,
+                            msg: format!(
+                                "Inconsistent lineages for taxon {}: {} != {}",
+                                level, curr_prefix, prev_prefix
+                            ),
+                        }));
+                    }
+                    continue;
+                }
+                None => {
+                    let tax_rank = match &level[..3] {
+                        "d__" => TaxRank::Domain,
+                        "p__" => TaxRank::Phylum,
+                        "c__" => TaxRank::Class,
+                        "o__" => TaxRank::Order,
+                        "f__" => TaxRank::Family,
+                        "g__" => TaxRank::Genus,
+                        "s__" => TaxRank::Species,
+                        _ => TaxRank::Unspecified,
+                    };
+                    tax_names.push(level.to_string());
+                    tax_ranks.push(tax_rank);
+                    let idx = tax_names.len() - 1;
+                    tax_names_idx.insert(level.to_string(), (idx, curr_prefix));
+                    if i > 0 {
+                        let parent_id = tax_names_idx.get(lineage[i - 1]).unwrap().0;
+                        parent_ids.push(parent_id);
+                    } else {
+                        parent_ids.push(0);
+                    }
+                }
             }
         }
     }
@@ -107,6 +123,12 @@ mod tests {
     #[test]
     fn invalid_gtdb_format() {
         let mut file = File::open("tests/data/gtdb_invalid.tsv").unwrap();
+        assert!(load(&mut file).is_err());
+    }
+
+    #[test]
+    fn inconsistent_gtdb_taxonomy() {
+        let mut file = File::open("tests/data/gtdb_inconsistent.tsv").unwrap();
         assert!(load(&mut file).is_err());
     }
 }
