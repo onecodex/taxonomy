@@ -235,6 +235,7 @@ class GtdbTestCase(unittest.TestCase):
     def test_root(self):
         root = self.tax.root
         self.assertEqual(root.id, "d__Bacteria")
+        self.assertEqual(root.rank, "domain")
         self.assertIsNone(root.parent)
 
     def test_lineage(self):

@@ -1,5 +1,6 @@
 //! Code related to handling of taxonomic ranks
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::str::FromStr;
 
 use crate::errors::{Error, ErrorKind, TaxonomyResult};
@@ -107,7 +108,7 @@ pub enum TaxRank {
 }
 
 impl TaxRank {
-    /// Coverts a TaxRank into a one of the rank strings NCBI uses.
+    /// Converts a TaxRank into a one of the rank strings NCBI uses.
     /// Note that this doesn't handle ranks that are not used by the NCBI taxonomy.
     pub fn to_ncbi_rank(self) -> &'static str {
         match self {
@@ -187,7 +188,7 @@ impl FromStr for TaxRank {
             "infraclass" => Ok(TaxRank::Infraclass),
             "parvclass" => Ok(TaxRank::Parvclass),
             // note "division" may be either a TaxRank::Division (zoological)
-            // or synonum for TaxRank::Phylum (botanical) so we don't impl here
+            // or synonym for TaxRank::Phylum (botanical) so we don't impl here
             "superlegion" => Ok(TaxRank::Superlegion),
             "legion" => Ok(TaxRank::Legion),
             "sublegion" => Ok(TaxRank::Sublegion),
@@ -249,6 +250,102 @@ impl FromStr for TaxRank {
             "pathogroup" => Ok(TaxRank::Pathogroup),
             _ => Err(Error::new(ErrorKind::UnknownRank(s.to_string()))),
         }
+    }
+}
+
+impl fmt::Display for TaxRank {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let rank_str = match self {
+            TaxRank::Domain => "domain",
+            TaxRank::Subdomain => "subdomain",
+            TaxRank::Realm => "realm",
+            TaxRank::Subrealm => "subrealm",
+            TaxRank::Hyperkingdom => "hyperkingdom",
+            TaxRank::Superkingdom => "superkingdom",
+            TaxRank::Kingdom => "kingdom",
+            TaxRank::Subkingdom => "subkingdom",
+            TaxRank::Infrakingdom => "infrakingdom",
+            TaxRank::Parvkingdom => "parvkingdom",
+            TaxRank::Superphylum => "superphylum",
+            TaxRank::Phylum => "phylum",
+            TaxRank::Subphylum => "subphylum",
+            TaxRank::Infraphylum => "infraphylum",
+            TaxRank::Microphylum => "microphylum",
+            TaxRank::Superclass => "superclass",
+            TaxRank::Class => "class",
+            TaxRank::Subclass => "subclass",
+            TaxRank::Infraclass => "infraclass",
+            TaxRank::Parvclass => "parvclass",
+            TaxRank::Superdivision => "superdivision",
+            TaxRank::Division => "division",
+            TaxRank::Subdivision => "subdivision",
+            TaxRank::Infradivision => "infradivision",
+            TaxRank::Superlegion => "superlegion",
+            TaxRank::Legion => "legion",
+            TaxRank::Sublegion => "sublegion",
+            TaxRank::Infralegion => "infralegion",
+            TaxRank::Supercohort => "supercohort",
+            TaxRank::Cohort => "cohort",
+            TaxRank::Subcohort => "subcohort",
+            TaxRank::Infracohort => "infracohort",
+            TaxRank::Superorder => "superorder",
+            TaxRank::Gigaorder => "gigaorder",
+            TaxRank::Magnorder => "magnorder",
+            TaxRank::Grandorder => "grandorder",
+            TaxRank::Mirorder => "mirorder",
+            TaxRank::SeriesFish => "series fish",
+            TaxRank::Order => "order",
+            TaxRank::Nanorder => "nanorder",
+            TaxRank::Hypoorder => "hypoorder",
+            TaxRank::Minorder => "minorder",
+            TaxRank::Suborder => "suborder",
+            TaxRank::Infraorder => "infraorder",
+            TaxRank::Parvorder => "parvorder",
+            TaxRank::Section => "section",
+            TaxRank::Subsection => "subsection",
+            TaxRank::Gigafamily => "gigafamily",
+            TaxRank::Megafamily => "megafamily",
+            TaxRank::Grandfamily => "grandfamily",
+            TaxRank::Hyperfamily => "hyperfamily",
+            TaxRank::Superfamily => "superfamily",
+            TaxRank::Epifamily => "epifamily",
+            TaxRank::SeriesLepidoptera => "series lepidoptera",
+            TaxRank::GroupLepidoptera => "group lepidoptera",
+            TaxRank::Family => "family",
+            TaxRank::Subfamily => "subfamily",
+            TaxRank::Infrafamily => "infrafamily",
+            TaxRank::Supertribe => "supertribe",
+            TaxRank::Tribe => "tribe",
+            TaxRank::Subtribe => "subtribe",
+            TaxRank::Infratribe => "infratribe",
+            TaxRank::Genus => "genus",
+            TaxRank::Subgenus => "subgenus",
+            TaxRank::Series => "series",
+            TaxRank::SubseriesBotany => "subseries botany",
+            TaxRank::SpeciesGroup => "species group",
+            TaxRank::SpeciesSubgroup => "species subgroup",
+            TaxRank::Species => "species",
+            TaxRank::Subspecies => "subspecies",
+            TaxRank::Varietas => "varietas",
+            TaxRank::Subvarietas => "subvarietas",
+            TaxRank::Forma => "forma",
+            TaxRank::Subforma => "subforma",
+            TaxRank::Cultivar => "cultivar",
+            TaxRank::Breed => "breed",
+            TaxRank::Strain => "strain",
+            TaxRank::Individual => "individual",
+            TaxRank::SeroGroup => "serogroup",
+            TaxRank::Unspecified => "no rank",
+            TaxRank::Biotype => "biotype",
+            TaxRank::Clade => "clade",
+            TaxRank::FormaSpecialis => "forma specialis",
+            TaxRank::Isolate => "isolate",
+            TaxRank::Serotype => "serotype",
+            TaxRank::Genotype => "genotype",
+            TaxRank::Morph => "morph",
+            TaxRank::Pathogroup => "pathogroup",
+        };
+        write!(f, "{}", rank_str)
     }
 }
 
@@ -353,5 +450,18 @@ mod test {
             assert!(TaxRank::from_str(rank.to_ncbi_rank()).is_ok());
         }
         assert!(TaxRank::from_str("fake_data").is_err());
+    }
+
+    #[test]
+    fn test_rank_to_str() {
+        for rank in RANKS.iter() {
+            let rank_str = rank.to_string();
+            assert!(rank_str.len() > 0);
+
+            let ncbi_str = rank.to_ncbi_rank();
+            if ncbi_str != "no rank" {
+                assert_eq!(ncbi_str, rank_str);
+            }
+        }
     }
 }
