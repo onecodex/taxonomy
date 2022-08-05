@@ -456,7 +456,7 @@ mod test {
     fn test_rank_to_str() {
         for rank in RANKS.iter() {
             let rank_str = rank.to_string();
-            assert!(rank_str.len() > 0);
+            assert!(!rank_str.is_empty());
 
             let ncbi_str = rank.to_ncbi_rank();
             if ncbi_str != "no rank" {
