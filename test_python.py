@@ -227,5 +227,43 @@ class NCBITestCase(unittest.TestCase):
         )
 
 
+class GtdbTestCase(unittest.TestCase):
+    def setUp(self):
+        with open("tests/data/gtdb_sample.tsv") as file:
+            self.tax = Taxonomy.from_gtdb(file.read())
+
+    def test_root(self):
+        root = self.tax.root
+        self.assertEqual(root.id, "d__Bacteria")
+        self.assertEqual(root.rank, "domain")
+        self.assertIsNone(root.parent)
+
+    def test_lineage(self):
+        self.assertEqual([n.id for n in self.tax.lineage("d__Bacteria")], ["d__Bacteria"])
+
+        self.assertEqual(
+            [n.id for n in self.tax.lineage("c__Bacilli")],
+            ["c__Bacilli", "p__Firmicutes", "d__Bacteria"]
+        );
+
+        self.assertEqual(
+            [n.id for n in self.tax.lineage("s__Escherichia coli")],
+            [
+                "s__Escherichia coli",
+                "g__Escherichia",
+                "f__Enterobacteriaceae",
+                "o__Enterobacterales",
+                "c__Gammaproteobacteria",
+                "p__Proteobacteria",
+                "d__Bacteria"
+            ]
+        );
+
+    def test_invalid_format(self):
+        with open("tests/data/gtdb_invalid.tsv") as file:
+            with self.assertRaises(TaxonomyError):
+                Taxonomy.from_gtdb(file.read())
+
+
 if __name__ == "__main__":
     unittest.main()

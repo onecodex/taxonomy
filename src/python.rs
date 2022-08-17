@@ -14,7 +14,7 @@ use crate::base::InternalIndex;
 use crate::json::JsonFormat;
 use crate::rank::TaxRank;
 use crate::Taxonomy as TaxonomyTrait;
-use crate::{json, ncbi, newick, phyloxml, prune_away, prune_to, GeneralTaxonomy};
+use crate::{gtdb, json, ncbi, newick, phyloxml, prune_away, prune_to, GeneralTaxonomy};
 
 create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::PyException);
 
@@ -132,21 +132,21 @@ impl Taxonomy {
         Ok(name)
     }
 
-    pub(crate) fn get_ncbi_rank(&self, tax_id: &str) -> PyResult<&str> {
-        let rank = py_try!(self.tax.rank(tax_id)).to_ncbi_rank();
+    pub(crate) fn get_rank(&self, tax_id: &str) -> PyResult<String> {
+        let rank = py_try!(self.tax.rank(tax_id)).to_string();
         Ok(rank)
     }
 
     pub(crate) fn as_node(&self, tax_id: &str) -> PyResult<TaxonomyNode> {
         let name = self.get_name(tax_id)?;
-        let rank = self.get_ncbi_rank(tax_id)?;
+        let rank = self.get_rank(tax_id)?;
         let parent = py_try!(self.tax.parent(tax_id)).map(|(p, _)| p.to_string());
         let extra = py_try!(self.tax.data(tax_id));
 
         Ok(TaxonomyNode {
             id: tax_id.to_string(),
             name: name.to_string(),
-            rank: rank.to_string(),
+            rank,
             extra: (*extra).to_owned(),
             parent,
         })
@@ -155,6 +155,17 @@ impl Taxonomy {
 
 #[pymethods]
 impl Taxonomy {
+    /// from_gtdb(cls, value: str)
+    /// --
+    ///
+    /// Load a Taxonomy from a GTDB-encoded string.
+    #[classmethod]
+    fn from_gtdb(_cls: &PyType, value: &str) -> PyResult<Taxonomy> {
+        let mut c = Cursor::new(value);
+        let tax = py_try!(gtdb::load(&mut c));
+        Ok(Taxonomy { tax })
+    }
+
     /// from_json(cls, value: str, /, json_pointer: str)
     /// --
     ///

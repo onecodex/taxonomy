@@ -44,7 +44,7 @@ where
             out_buf.push_back(NewickToken::Start);
         } else {
             out_buf.push_back(NewickToken::End);
-            let mut name: String = format!("{}", node);
+            let mut name: String = node.to_string().split_whitespace().collect();
             if let Some((_, dist)) = taxonomy.parent(node)? {
                 if dist > 0.0 {
                     name.push(':');
