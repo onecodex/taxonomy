@@ -5,14 +5,48 @@ use std::hash::Hash;
 use std::io::{Read, Write};
 use std::str::FromStr;
 
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use serde_json::{json, to_value, to_writer, Value};
-
 use crate::base::GeneralTaxonomy;
 use crate::errors::{Error, ErrorKind, TaxonomyResult};
 use crate::rank::TaxRank;
 use crate::Taxonomy;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::{json, to_value, to_writer, Value};
 
+/// We can handle 2 kinds of JSON formats:
+/// 1. the node link format
+/// 2. the tree format
+///
+/// The node link format comes from an old version of [NetworkX](https://networkx.org)
+///  and looks like the following:
+/// ```{'nodes': [{'id': 'A'}, {'id': 'B'}], 'links': [{'source': 0, 'target': 1}]}```
+/// This format is only used as legacy and is not recommended for new projects
+/// as it's easy to mess up and not even supported anymore by NetworkX.
+///
+/// The tree format is a more natural looking format (only `id` is required):
+/// ```json
+/// {
+///     "id": "1",
+///     "name": "root",
+///     "rank": "no rank",
+///     "children": [
+///         {
+///             "id": "2",
+///             "name": "Bacteria",
+///             "rank": "no rank",
+///             "children": [
+///                 {
+///                     "id": "562",
+///                     "name": "Escherichia coli",
+///                     "rank": "species",
+///                 }
+///             ]
+///         }
+///     ]
+// }
+/// ```
+//
+/// For both formats, you can add more data on each node object and these will be available after loading.
+/// If a `rank` propery is present, it will be parsed as a NCBI rank.
 #[derive(Eq, PartialEq)]
 pub enum JsonFormat {
     /// The node link format is made of 2 arrays:
@@ -20,7 +54,9 @@ pub enum JsonFormat {
     ///    the nodes array
     /// 2. the links between each node: a `source` node has a `parent` node.
     /// The nodes are represented by indices in the nodes array
+    /// Only use that format if you have existing taxonomies in that format.
     NodeLink,
+    /// The preferred format
     Tree,
 }
 

@@ -34,16 +34,18 @@ Note that Taxonomy IDs in NCBI format are integers, but they're converted to str
 
 ### Loading a taxonomy
 
-Taxonomy can be loaded from a variety of sources.
+Taxonomy can be loaded from a variety of sources. 
 
 1. `Taxonomy.from_newick(value: str)`: loads a Taxonomy from a Newick-encoded string.
 
 2. `Taxonomy.from_ncbi(ncbi_filder: str)`: loads a Taxonomy from a pair of NCBI dump files. The folder needs to contain the individual files in the NCBI taxonomy directory (e.g. nodes.dmp and names.dmp).
 
 3. `Taxonomy.from_json(value: str, /, json_pointer: str)`: loads a Taxonomy from a JSON-encoded string. The format can either be
-of the tree or node_link_data types and will be automatically detected. If `path` is specified, the JSON will be traversed to that sub-object before being parsed as a taxonomy.
+of the tree or node_link_data types and will be automatically detected (more details on both formats on [the documentation](https://docs.rs/taxonomy/latest/taxonomy/json/enum.JsonFormat.html). If `json_pointer` is specified, the JSON will be traversed to that sub-object before being parsed as a taxonomy.
 
 4. `Taxonomy.from_phyloxml(value: &str)`: loads a Taxonomy from a PhyloXML-encoded string. **Experimental**
+
+5. `Taxonomy.from_gtdb(value: &str)`: loads a Taxonomy from a GTDB-encoded string. **Experimental**
 
 ### Exporting a taxonomy
 
