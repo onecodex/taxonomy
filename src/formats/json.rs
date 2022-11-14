@@ -126,23 +126,6 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
         tax_nodes.push(node);
     }
 
-    // The JSON import might be messed up so we sort the nodes by ids
-    // but since the links refer to their position, we need to first record them
-    #[allow(clippy::needless_collect)]
-    let initial_positions: Vec<_> = tax_nodes.iter().map(|n| n.id.clone()).collect();
-    tax_nodes.sort_unstable_by(|a, b| {
-        let tax_id_a = a.id.parse::<usize>().unwrap();
-        let tax_id_b = b.id.parse::<usize>().unwrap();
-        tax_id_a.cmp(&tax_id_b)
-    });
-    let after_positions: Vec<_> = tax_nodes.iter().map(|n| &n.id).collect();
-
-    let mut idx_mapping_after_sorting = HashMap::new();
-    for (i, id) in initial_positions.into_iter().enumerate() {
-        idx_mapping_after_sorting
-            .insert(i, after_positions.iter().position(|p| *p == &id).unwrap());
-    }
-
     let tax_links = tax_json["links"]
         .as_array()
         .ok_or_else(|| {
@@ -188,11 +171,7 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
             }));
         }
 
-        // Then we need to fix up the parents if needed since we might have re-ordered
-        // content
-        let fixed_source = idx_mapping_after_sorting[&link.source];
-        let fixed_target = idx_mapping_after_sorting[&link.target];
-        parent_ids[fixed_source] = fixed_target;
+        parent_ids[link.source] = link.target;
     }
 
     GeneralTaxonomy::from_arrays(
@@ -351,6 +330,7 @@ where
     let mut links = Vec::new();
     let mut id_to_idx = HashMap::new();
 
+    // order of nodes in json will depend on tax#traverse
     for (ix, (tid, _pre)) in tax.traverse(root_id)?.filter(|x| x.1).enumerate() {
         let node = TaxNode {
             id: tid.to_string(),
