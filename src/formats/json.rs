@@ -481,8 +481,7 @@ mod tests {
         assert!(load(Cursor::new(example), None).is_err());
     }
 
-    #[test]
-    fn can_load_node_link_and_fix_order_them() {
+    fn create_test_taxonomy() -> GeneralTaxonomy {
         let example = r#"
 {
   "multigraph": false,
@@ -587,8 +586,22 @@ mod tests {
       "target": 0
     }
   ]
-}        "#;
-        let tax = load(Cursor::new(example), None).unwrap();
+}
+            "#;
+
+        load(Cursor::new(example), None).unwrap()
+    }
+
+    #[test]
+    fn generates_internal_ids_correctly() {
+        let tax = create_test_taxonomy();
+        assert_eq!(tax.to_internal_index("9").unwrap(), 1);
+        assert_eq!(tax.to_internal_index("10").unwrap(), 10);
+    }
+
+    #[test]
+    fn can_load_node_link_and_fix_order_them() {
+        let tax = create_test_taxonomy();
         assert_eq!(Taxonomy::<&str>::len(&tax), 11);
         assert_eq!(Taxonomy::<&str>::root(&tax), "1");
         assert_eq!(
