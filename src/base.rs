@@ -392,13 +392,13 @@ mod tests {
         let example = r#"{
             "nodes": [
                 {"id": "1", "name": "root", "readcount": 1000},
-                {"id": "2", "name": "Bacteria", "rank": "no rank", "readcount": 1000},
                 {"id": "562", "name": "Escherichia coli", "rank": "species", "readcount": 1000},
+                {"id": "2", "name": "Bacteria", "rank": "no rank", "readcount": 1000},
                 {"id": "1000", "name": "Covid", "rank": "", "readcount": 1000}
             ],
             "links": [
-                {"source": 1, "target": 0},
-                {"source": 2, "target": 1},
+                {"source": 1, "target": 2},
+                {"source": 2, "target": 0},
                 {"source": 3, "target": 0}
             ]
         }"#;
@@ -414,6 +414,22 @@ mod tests {
         assert_eq!(tax.name("562").unwrap(), "Escherichia coli");
         assert_eq!(tax.rank("562").unwrap(), TaxRank::Species);
         assert_eq!(tax.parent("562").unwrap(), Some(("2", 1.0)));
+    }
+
+    #[test]
+    fn generates_internal_ids_correctly() {
+        let tax = create_test_taxonomy();
+        assert_eq!(tax.to_internal_index("1").unwrap(), 0);
+        assert_eq!(tax.to_internal_index("562").unwrap(), 1);
+        assert_eq!(tax.to_internal_index("2").unwrap(), 2);
+        assert_eq!(tax.to_internal_index("1000").unwrap(), 3);
+    }
+
+    #[test]
+    fn generates_lineages_correctly() {
+        let tax = create_test_taxonomy();
+        assert_eq!(tax.lineage("562").unwrap(), ["562", "2", "1"]);
+        assert_eq!(tax.lineage(1).unwrap(), [1, 2, 0]);
     }
 
     #[test]
