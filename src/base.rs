@@ -183,15 +183,16 @@ impl GeneralTaxonomy {
         Ok(tax)
     }
 
-    /// Retrieves the external ID given its name
+    /// Retrieves all external IDs given a name
     ///
     /// Always return `None` on Newick since it doesn't contain names.
-    pub fn find_by_name(&self, name: &str) -> Option<&str> {
-        if let Some(pos) = self.names.iter().position(|s| s == name) {
-            Some(&self.tax_ids[pos])
-        } else {
-            None
-        }
+    pub fn find_all_by_name(&self, name: &str) -> Vec<&std::string::String> {
+        self.names
+            .iter()
+            .enumerate()
+            .filter(|(_, val)| val == &name)
+            .map(|(pos, _)| &self.tax_ids[pos])
+            .collect::<Vec<&std::string::String>>()
     }
 
     /// Add a new node to the taxonomy.
@@ -394,12 +395,16 @@ mod tests {
                 {"id": "1", "name": "root", "readcount": 1000},
                 {"id": "2", "name": "Bacteria", "rank": "no rank", "readcount": 1000},
                 {"id": "562", "name": "Escherichia coli", "rank": "species", "readcount": 1000},
-                {"id": "1000", "name": "Covid", "rank": "", "readcount": 1000}
+                {"id": "1000", "name": "Covid", "rank": "", "readcount": 1000},
+                {"id": "101", "name": "Proteus", "rank": "", "readcount": 1000},
+                {"id": "102", "name": "Proteus", "rank": "", "readcount": 1000}
             ],
             "links": [
                 {"source": 1, "target": 0},
                 {"source": 2, "target": 1},
-                {"source": 3, "target": 0}
+                {"source": 3, "target": 0},
+                {"source": 4, "target": 0},
+                {"source": 5, "target": 0}
             ]
         }"#;
 
@@ -409,18 +414,20 @@ mod tests {
     #[test]
     fn implements_taxonomy_correctly() {
         let tax = create_test_taxonomy();
-        assert_eq!(Taxonomy::<&str>::len(&tax), 4);
-        assert_eq!(tax.children("1").unwrap(), vec!["2", "1000"]);
+        assert_eq!(Taxonomy::<&str>::len(&tax), 6);
+        assert_eq!(tax.children("1").unwrap(), vec!["2", "1000", "101", "102"]);
         assert_eq!(tax.name("562").unwrap(), "Escherichia coli");
         assert_eq!(tax.rank("562").unwrap(), TaxRank::Species);
         assert_eq!(tax.parent("562").unwrap(), Some(("2", 1.0)));
     }
 
     #[test]
-    fn can_find_by_name() {
+    fn can_find_all_by_name() {
         let tax = create_test_taxonomy();
-        let res = tax.find_by_name("Bacteria");
-        assert_eq!(res, Some("2"));
+        let res = tax.find_all_by_name("Bacteria");
+        assert_eq!(res, vec!["2"]);
+        let res = tax.find_all_by_name("Proteus");
+        assert_eq!(res, vec!["101", "102"]);
     }
 
     #[test]

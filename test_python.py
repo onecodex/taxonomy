@@ -62,6 +62,11 @@ JSON_DATA = """
       "name": "species 1.1",
       "rank": "species",
       "id": 10
+    },
+    {
+      "name": "species 1.1",
+      "rank": "species",
+      "id": 12
     }
   ],
   "links": [
@@ -104,6 +109,10 @@ JSON_DATA = """
     {
       "source": 2,
       "target": 0
+    },
+    {
+      "source": 11,
+      "target": 4
     }
   ]
 }        """
@@ -123,6 +132,11 @@ class JsonTestCase(unittest.TestCase):
                 for x in ["1", "9", "2", "11", "8", "5", "3", "4", "6", "7", "10"]
             ],
             [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        )
+
+    def test_find_all_by_name(self):
+        self.assertEqual(
+            sorted([n.id for n in self.tax.find_all_by_name("species 1.1")]), ["10", "12"]
         )
 
 
@@ -160,10 +174,10 @@ class NewickTestCase(unittest.TestCase):
         with self.assertRaises(TaxonomyError):
             _ = self.tax["unknown"]
 
-    def test_find_by_name(self):
+    def test_find_all_by_name(self):
         # They are not named so we can't find anything by name
-        node = self.tax.find_by_name("A")
-        self.assertIsNone(node)
+        nodes = self.tax.find_all_by_name("A")
+        self.assertEqual(nodes, [])
 
     def test_parent(self):
         parent = self.tax.parent("D")
@@ -265,10 +279,10 @@ class NCBITestCase(unittest.TestCase):
             _ = self.tax["unknown"]
 
     def test_find_by_name(self):
-        node = self.tax.find_by_name("Escherichia coli")
-        self.assertEqual(node.id, "562")
-        self.assertEqual(node.name, "Escherichia coli")
-        self.assertEqual(node.parent, "561")
+        nodes = self.tax.find_all_by_name("Escherichia coli")
+        self.assertEqual([n.id for n in nodes], ["562"])
+        self.assertEqual([n.name for n in nodes], ["Escherichia coli"])
+        self.assertEqual([n.parent for n in nodes], ["561"])
 
     def test_parent(self):
         parent = self.tax.parent("562")
