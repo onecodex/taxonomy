@@ -138,6 +138,11 @@ Add a new node to the tree at the parent provided.
 
 Edit properties on a taxonomy node.
 
+#### `internal_index(tax_id: str)`
+
+Return internal integer index used by some applications. For the JSON node-link
+format, this is the positional index of each node in the nodes array.
+
 ### Exceptions
 Only one exception is raised intentionally by the library: `TaxonomyError`.
 If you get a `pyo3_runtime.PanicException` (or anything with `pyo3` in its name), this is a bug in the underlying Rust library, please open an issue.
