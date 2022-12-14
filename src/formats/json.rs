@@ -16,7 +16,8 @@ use crate::Taxonomy;
 #[derive(Eq, PartialEq)]
 pub enum JsonFormat {
     /// The node link format is made of 2 arrays:
-    /// 1. the nodes with their taxonomic info, in theory sorted by tax id
+    /// 1. the nodes with their taxonomic info. Internal (integer) IDs are the node's position in
+    ///    the nodes array
     /// 2. the links between each node: a `source` node has a `parent` node.
     /// The nodes are represented by indices in the nodes array
     NodeLink,
@@ -126,23 +127,6 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
         tax_nodes.push(node);
     }
 
-    // The JSON import might be messed up so we sort the nodes by ids
-    // but since the links refer to their position, we need to first record them
-    #[allow(clippy::needless_collect)]
-    let initial_positions: Vec<_> = tax_nodes.iter().map(|n| n.id.clone()).collect();
-    tax_nodes.sort_unstable_by(|a, b| {
-        let tax_id_a = a.id.parse::<usize>().unwrap();
-        let tax_id_b = b.id.parse::<usize>().unwrap();
-        tax_id_a.cmp(&tax_id_b)
-    });
-    let after_positions: Vec<_> = tax_nodes.iter().map(|n| &n.id).collect();
-
-    let mut idx_mapping_after_sorting = HashMap::new();
-    for (i, id) in initial_positions.into_iter().enumerate() {
-        idx_mapping_after_sorting
-            .insert(i, after_positions.iter().position(|p| *p == &id).unwrap());
-    }
-
     let tax_links = tax_json["links"]
         .as_array()
         .ok_or_else(|| {
@@ -188,11 +172,7 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
             }));
         }
 
-        // Then we need to fix up the parents if needed since we might have re-ordered
-        // content
-        let fixed_source = idx_mapping_after_sorting[&link.source];
-        let fixed_target = idx_mapping_after_sorting[&link.target];
-        parent_ids[fixed_source] = fixed_target;
+        parent_ids[link.source] = link.target;
     }
 
     GeneralTaxonomy::from_arrays(
@@ -501,9 +481,8 @@ mod tests {
         assert!(load(Cursor::new(example), None).is_err());
     }
 
-    #[test]
-    fn can_load_node_link_and_fix_order_them() {
-        let example = r#"
+    fn get_test_node_link_data() -> &'static str {
+        r#"
 {
   "multigraph": false,
   "directed": true,
@@ -607,7 +586,12 @@ mod tests {
       "target": 0
     }
   ]
-}        "#;
+}        "#
+    }
+
+    #[test]
+    fn can_load_node_link() {
+        let example = get_test_node_link_data();
         let tax = load(Cursor::new(example), None).unwrap();
         assert_eq!(Taxonomy::<&str>::len(&tax), 11);
         assert_eq!(Taxonomy::<&str>::root(&tax), "1");
@@ -615,6 +599,20 @@ mod tests {
             Taxonomy::<&str>::lineage(&tax, "10").unwrap(),
             vec!["10", "8", "7", "6", "5", "4", "3", "2", "1"]
         );
+    }
+
+    #[test]
+    fn can_use_node_index_as_internal_id() {
+        let example = get_test_node_link_data();
+        let tax = load(Cursor::new(example), None).unwrap();
+        let tax_ids = vec!["1", "9", "2", "11", "8", "5", "3", "4", "6", "7", "10"];
+        assert_eq!(
+            tax_ids
+                .into_iter()
+                .map(|i| tax.to_internal_index(i).unwrap())
+                .collect::<Vec<_>>(),
+            vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        )
     }
 
     #[test]
