@@ -86,7 +86,7 @@ where
     T: Clone + Debug + Display + PartialEq,
 {
     let dir = out_dir.as_ref();
-    std::fs::create_dir_all(&dir)?;
+    std::fs::create_dir_all(dir)?;
     let mut node_writer = BufWriter::new(std::fs::File::create(dir.join(NODES_FILENAME))?);
     let mut name_writer = BufWriter::new(std::fs::File::create(dir.join(NAMES_FILENAME))?);
 

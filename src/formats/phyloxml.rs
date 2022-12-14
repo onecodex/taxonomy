@@ -133,7 +133,7 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
         buf.clear();
     }
 
-    let has_any_names = names.iter().all(|n| n == &None);
+    let has_any_names = names.iter().all(|n| n.is_none());
 
     let cleaned_names: Option<Vec<String>> = if has_any_names {
         None
