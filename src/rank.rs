@@ -11,7 +11,7 @@ use crate::errors::{Error, ErrorKind, TaxonomyResult};
 /// by forcing all taxonomic ranks to fall within the below categories
 /// (this includes all current NCBI ranks and a few others, mostly ones
 /// specific to zoology and botany).
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum TaxRank {
     Domain,

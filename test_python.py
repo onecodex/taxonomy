@@ -2,6 +2,129 @@ import unittest
 
 from taxonomy import Taxonomy, TaxonomyError
 
+JSON_DATA = """
+{
+  "multigraph": false,
+  "directed": true,
+  "graph": [],
+  "nodes": [
+    {
+      "name": "root",
+      "rank": "no rank",
+      "id": 1
+    },
+    {
+      "name": "genus 2",
+      "rank": "genus",
+      "id": 9
+    },
+    {
+      "name": "superkingdom 1",
+      "rank": "superkingdom",
+      "id": 2
+    },
+    {
+      "name": "species 2.1",
+      "rank": "species",
+      "id": 11
+    },
+    {
+      "name": "genus 1",
+      "rank": "genus",
+      "id": 8
+    },
+    {
+      "name": "class 1",
+      "rank": "class",
+      "id": 5
+    },
+    {
+      "name": "kingdom 1",
+      "rank": "kingdom",
+      "id": 3
+    },
+    {
+      "name": "phylum 1",
+      "rank": "phylum",
+      "id": 4
+    },
+    {
+      "name": "order 1",
+      "rank": "order",
+      "id": 6
+    },
+    {
+      "name": "family 1",
+      "rank": "family",
+      "id": 7
+    },
+    {
+      "name": "species 1.1",
+      "rank": "species",
+      "id": 10
+    }
+  ],
+  "links": [
+    {
+      "source": 3,
+      "target": 1
+    },
+    {
+      "source": 10,
+      "target": 4
+    },
+    {
+      "source": 1,
+      "target": 9
+    },
+    {
+      "source": 4,
+      "target": 9
+    },
+    {
+      "source": 9,
+      "target": 8
+    },
+    {
+      "source": 8,
+      "target": 5
+    },
+    {
+      "source": 5,
+      "target": 7
+    },
+    {
+      "source": 7,
+      "target": 6
+    },
+    {
+      "source": 6,
+      "target": 2
+    },
+    {
+      "source": 2,
+      "target": 0
+    }
+  ]
+}        """
+
+
+class JsonTestCase(unittest.TestCase):
+    def _create_tax(self):
+        return Taxonomy.from_json(JSON_DATA)
+
+    def setUp(self) -> None:
+        self.tax = self._create_tax()
+
+    def test_asdf(self):
+        self.assertEqual(
+            [
+                self.tax.internal_index(x)
+                for x in ["1", "9", "2", "11", "8", "5", "3", "4", "6", "7", "10"]
+            ],
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        )
+
 
 class NewickTestCase(unittest.TestCase):
     def _create_tax(self):
@@ -216,7 +339,7 @@ class NCBITestCase(unittest.TestCase):
     def test_edit_node_parent(self):
         tax = self._create_tax()
         self.assertEqual(tax["562"].parent, "561")
-        tax.edit_node('562', parent_id='1')
+        tax.edit_node("562", parent_id="1")
         self.assertEqual(tax["562"].parent, "1")
 
     def test_repr(self):
@@ -243,8 +366,8 @@ class GtdbTestCase(unittest.TestCase):
 
         self.assertEqual(
             [n.id for n in self.tax.lineage("c__Bacilli")],
-            ["c__Bacilli", "p__Firmicutes", "d__Bacteria"]
-        );
+            ["c__Bacilli", "p__Firmicutes", "d__Bacteria"],
+        )
 
         self.assertEqual(
             [n.id for n in self.tax.lineage("s__Escherichia coli")],
@@ -255,9 +378,9 @@ class GtdbTestCase(unittest.TestCase):
                 "o__Enterobacterales",
                 "c__Gammaproteobacteria",
                 "p__Proteobacteria",
-                "d__Bacteria"
-            ]
-        );
+                "d__Bacteria",
+            ],
+        )
 
     def test_invalid_format(self):
         with open("tests/data/gtdb_invalid.tsv") as file:

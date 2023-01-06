@@ -70,7 +70,7 @@ where
         }
         // remove terminal commas from lists
         if token == NewickToken::Delim
-            && (next_token == Some(&NewickToken::End) || next_token == None)
+            && (next_token == Some(&NewickToken::End) || next_token.is_none())
         {
             continue;
         }
