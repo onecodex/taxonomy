@@ -193,7 +193,10 @@ impl GeneralTaxonomy {
             .map(|(pos, _)| pos)
             .collect::<Vec<usize>>();
 
-        name_indices.iter().map(|&pos| &self.tax_ids[pos] as &str).collect()
+        name_indices
+            .iter()
+            .map(|&pos| &self.tax_ids[pos] as &str)
+            .collect()
     }
 
     /// Add a new node to the taxonomy.
@@ -346,10 +349,7 @@ impl<'t> Taxonomy<'t, InternalIndex> for GeneralTaxonomy {
         if idx >= self.parent_ids.len() {
             return Err(Error::new(ErrorKind::NoSuchInternalIndex(idx)));
         }
-        Ok(Some((
-            self.parent_ids[idx as usize],
-            self.parent_distances[idx as usize],
-        )))
+        Ok(Some((self.parent_ids[idx], self.parent_distances[idx])))
     }
 
     fn name(&'t self, idx: InternalIndex) -> TaxonomyResult<&str> {
