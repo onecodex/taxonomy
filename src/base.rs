@@ -184,15 +184,16 @@ impl GeneralTaxonomy {
     }
 
     /// Retrieves all external IDs given a name
-    ///
-    /// Always return `None` on Newick since it doesn't contain names.
-    pub fn find_all_by_name(&self, name: &str) -> Vec<&std::string::String> {
-        self.names
+    pub fn find_all_by_name(&self, name: &str) -> Vec<&str> {
+        let name_indices = self
+            .names
             .iter()
             .enumerate()
             .filter(|(_, val)| val == &name)
-            .map(|(pos, _)| &self.tax_ids[pos])
-            .collect::<Vec<&std::string::String>>()
+            .map(|(pos, _)| pos)
+            .collect::<Vec<usize>>();
+
+        name_indices.iter().map(|&pos| &self.tax_ids[pos] as &str).collect()
     }
 
     /// Add a new node to the taxonomy.
