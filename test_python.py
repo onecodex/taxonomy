@@ -278,7 +278,7 @@ class NCBITestCase(unittest.TestCase):
         with self.assertRaises(TaxonomyError):
             _ = self.tax["unknown"]
 
-    def test_find_by_name(self):
+    def test_find_all_by_name(self):
         nodes = self.tax.find_all_by_name("Escherichia coli")
         self.assertEqual([n.id for n in nodes], ["562"])
         self.assertEqual([n.name for n in nodes], ["Escherichia coli"])
