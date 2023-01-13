@@ -273,16 +273,17 @@ impl Taxonomy {
         self.as_node(tax_id).ok()
     }
 
-    /// find_by_name(self, name: str) -> TaxonomyNode
+    /// find_all_by_name(self, name: str) -> List[TaxonomyNode]
     /// --
     ///
     /// Find a node by its name, Raises an exception if not found.
-    fn find_by_name(&self, name: &str) -> Option<TaxonomyNode> {
-        if let Some(tax_id) = self.tax.find_by_name(name) {
-            self.as_node(tax_id).ok()
-        } else {
-            None
-        }
+    fn find_all_by_name(&self, name: &str) -> PyResult<Vec<TaxonomyNode>> {
+        Ok(self
+            .tax
+            .find_all_by_name(name)
+            .iter()
+            .map(|tax_id| self.as_node(tax_id).unwrap())
+            .collect::<Vec<TaxonomyNode>>())
     }
 
     /// parent_with_distance(self, tax_id: str, /, at_rank: str)
