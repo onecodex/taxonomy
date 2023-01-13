@@ -12,7 +12,7 @@ use crate::taxonomy::Taxonomy;
 const NODES_FILENAME: &str = "nodes.dmp";
 const NAMES_FILENAME: &str = "names.dmp";
 
-/// Loads na taxonomy from the given directory.
+/// Loads a NCBI taxonomy from the given directory.
 /// The directory should contain at least two files: `nodes.dmp` and `names.dmp`.
 pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy> {
     let dir = ncbi_directory.as_ref();

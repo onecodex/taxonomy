@@ -100,9 +100,9 @@ Returns the node at that id. Returns `None` if not found.
 You can also use indexing to accomplish that: `tax["some_id"]` but this will raise an exception if the node
 is not found.
 
-#### `tax.find_by_name(name: str) -> Optional[TaxonomyNode]`
+#### `tax.find_all_by_name(name: str) -> List[TaxonomyNode]`
 
-Returns the node with that name. Returns `None` if not found.
+Returns all the nodes with that name.
 In NCBI, it only accounts for *scientific names* and not synonyms.
 
 #### `tax.children(tax_id: str) -> List[TaxonomyNode]`
