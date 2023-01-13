@@ -18,10 +18,10 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
     // find the <phylogeny> inside the XML
     let mut buf = Vec::new();
     loop {
-        let evt = xml_reader.read_event(&mut buf)?;
+        let evt = xml_reader.read_event_into(&mut buf)?;
         match evt {
             Event::Start(ref e) => {
-                if e.name() == b"phylogeny" {
+                if e.name().as_ref() == b"phylogeny" {
                     break;
                 }
             }
@@ -46,9 +46,9 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
 
     let mut current_tag: Vec<u8> = b"".to_vec();
     loop {
-        match xml_reader.read_event(&mut buf)? {
+        match xml_reader.read_event_into(&mut buf)? {
             Event::Start(ref e) => {
-                match e.name() {
+                match e.name().as_ref() {
                     b"phylogeny" => {
                         return Err(Error::new(ErrorKind::ImportError {
                             line: 0,
@@ -63,7 +63,8 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
                                 // (e.g. <test a=">) but there's no way to pass the error
                                 // out easily; we should probably figure out how to do that though
                                 let att = a.unwrap();
-                                (att.key, att.unescape_and_decode_value(&xml_reader).unwrap())
+                                let value = att.unescape_value().unwrap().to_string();
+                                (att.key.0, value)
                             })
                             .collect();
                         cur_lineage.push(if tax_ids.is_empty() {
@@ -93,7 +94,7 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
                 }
             }
             Event::End(ref e) => {
-                match e.name() {
+                match e.name().as_ref() {
                     b"phylogeny" => break,
                     b"clade" => {
                         cur_lineage.pop();
@@ -106,7 +107,7 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
                     // sometimes the phylogeny itself has a <name>
                     continue;
                 }
-                let text = e.unescape_and_decode(&xml_reader)?;
+                let text = e.unescape()?.to_string();
                 match &current_tag[..] {
                     b"name" => *names.last_mut().unwrap() = Some(text),
                     b"id" => *tax_ids.last_mut().unwrap() = text,
