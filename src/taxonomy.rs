@@ -5,6 +5,9 @@ use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Display};
 
+/// The trait to implement for each form we implement.
+/// It does include some default implementations for a few functions as well as a way
+/// to iterate through it, starting with the specified node.
 pub trait Taxonomy<'t, T: 't>
 where
     T: Clone + Debug + Display + PartialEq,

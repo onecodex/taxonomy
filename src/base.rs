@@ -11,6 +11,10 @@ use crate::taxonomy::Taxonomy;
 
 pub type InternalIndex = usize;
 
+/// The type that is returned when loading any taxonomies through that library.
+/// It include 2 implementations of the [Taxonomy] trait: one using strings as ids
+/// (easier to use but slower) and one using internal indices (harder to use but faster).
+/// Most fields are public for flexibility reason.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct GeneralTaxonomy {
     pub tax_ids: Vec<String>,
