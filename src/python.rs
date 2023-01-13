@@ -29,9 +29,7 @@ macro_rules! py_try {
 }
 
 fn json_value_to_pyobject(val: &Value) -> PyObject {
-    let gil_guard = Python::acquire_gil();
-    let py = gil_guard.python();
-    match val {
+    Python::with_gil(|py| match val {
         Value::Null => py.None(),
         Value::Bool(b) => b.to_object(py),
         Value::Number(n) => {
@@ -59,7 +57,7 @@ fn json_value_to_pyobject(val: &Value) -> PyObject {
             }
             pydict.to_object(py)
         }
-    }
+    })
 }
 
 /// The data returned when looking up a taxonomy by id or by name
@@ -89,10 +87,8 @@ impl TaxonomyNode {
         }
     }
 
-    fn __getitem__(&self, obj: &PyAny) -> PyResult<PyObject> {
+    fn __getitem__(&self, obj: &PyAny, py: Python<'_>) -> PyResult<PyObject> {
         let key: &str = obj.extract()?;
-        let gil_guard = Python::acquire_gil();
-        let py = gil_guard.python();
         match key {
             "id" => Ok(self.id.to_object(py)),
             "name" => Ok(self.name.to_object(py)),
@@ -219,7 +215,7 @@ impl Taxonomy {
     /// --
     ///
     /// Export a Taxonomy as a JSON-encoded byte string in a tree format
-    fn to_json_tree(&self) -> PyResult<PyObject> {
+    fn to_json_tree(&self, py: Python<'_>) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
         py_try!(json::save::<_, &str, _>(
             &mut bytes,
@@ -227,8 +223,6 @@ impl Taxonomy {
             JsonFormat::Tree,
             None
         ));
-        let gil = Python::acquire_gil();
-        let py = gil.python();
         Ok(PyBytes::new(py, &bytes).into())
     }
 
@@ -236,7 +230,7 @@ impl Taxonomy {
     /// --
     ///
     /// Export a Taxonomy as a JSON-encoded byte string in a node link format
-    fn to_json_node_links(&self) -> PyResult<PyObject> {
+    fn to_json_node_links(&self, py: Python<'_>) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
         py_try!(json::save::<_, &str, _>(
             &mut bytes,
@@ -244,8 +238,6 @@ impl Taxonomy {
             JsonFormat::NodeLink,
             None
         ));
-        let gil = Python::acquire_gil();
-        let py = gil.python();
         Ok(PyBytes::new(py, &bytes).into())
     }
 
@@ -253,15 +245,13 @@ impl Taxonomy {
     /// --
     ///
     /// Export a Taxonomy as a Newick-encoded byte string.
-    fn to_newick(&self) -> PyResult<PyObject> {
+    fn to_newick(&self, py: Python<'_>) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
         py_try!(newick::save(
             &mut bytes,
             &self.tax,
             Some(TaxonomyTrait::<InternalIndex>::root(&self.tax))
         ));
-        let gil = Python::acquire_gil();
-        let py = gil.python();
         Ok(PyBytes::new(py, &bytes).into())
     }
 
@@ -514,11 +504,9 @@ impl Taxonomy {
         Ok(self.tax.to_internal_index(tax_id).is_ok())
     }
 
-    fn __iter__(slf: PyRefMut<Self>) -> PyResult<TaxonomyIterator> {
+    fn __iter__(slf: PyRefMut<Self>, py: Python<'_>) -> PyResult<TaxonomyIterator> {
         let root = slf.tax.root();
         let root_idx = slf.tax.to_internal_index(root).unwrap();
-        let gil_guard = Python::acquire_gil();
-        let py = gil_guard.python();
         Ok(TaxonomyIterator {
             t: slf.into_py(py),
             nodes_left: vec![root_idx],
@@ -536,9 +524,7 @@ pub struct TaxonomyIterator {
 
 #[pymethods]
 impl TaxonomyIterator {
-    fn __next__(mut slf: PyRefMut<Self>) -> PyResult<Option<String>> {
-        let gil_guard = Python::acquire_gil();
-        let py = gil_guard.python();
+    fn __next__(mut slf: PyRefMut<Self>, py: Python<'_>) -> PyResult<Option<String>> {
         let traverse_preorder = true;
         loop {
             if slf.nodes_left.is_empty() {
