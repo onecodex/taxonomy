@@ -247,6 +247,19 @@ class NewickTestCase(unittest.TestCase):
         node, distance = tax.parent_with_distance("D")
         self.assertEqual(distance, 3)
 
+    def test_can_clone(self):
+        tax = self._create_tax()
+        tax2 = tax.clone()
+        tax.remove_node("E")
+
+        self.assertIsNotNone(tax.node("D"))
+        self.assertIsNone(tax.node("E"))
+        self.assertEqual(len(tax), 5)
+
+        self.assertIsNotNone(tax2.node("D"))
+        self.assertIsNotNone(tax2.node("E"))
+        self.assertEqual(len(tax2), 6)
+
 
 class NCBITestCase(unittest.TestCase):
     def _create_tax(self):

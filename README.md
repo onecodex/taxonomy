@@ -72,6 +72,9 @@ Note that tax_id in parameters passed in functions described below are string bu
 to be essentially quoting integers: `562 -> "562"`. 
 If you loaded a taxonomy via JSON and you had additional data in your file, you can access it via indexing, `node["readcount"]` for example.
 
+#### `tax.clone() -> Taxonomy`
+Return a new taxonomy, equivalent to a deep copy.
+
 #### `tax.root -> TaxonomyNode`
 Points to the root of the taxonomy
 
@@ -161,7 +164,7 @@ To work on the Python library on a Mac OS X/Unix system (requires Python 3):
 curl https://sh.rustup.rs -sSf | sh
 
 # finally, install the library in the local virtualenv
-maturin develop --cargo-extra-args="--features=python"
+maturin develop --features python
 
 # or using pip
 pip install .
@@ -171,7 +174,7 @@ pip install .
 
 ```
 # The Mac build requires switching through a few different python versions
-maturin build --cargo-extra-args="--features=python" --release --strip
+maturin build --features python --release --strip
 
 # The linux build requires switching through different python versions and linux compatibility targets.
 # For example, to build for Python 3.10 and manylinux2010 compatibility:
