@@ -433,6 +433,9 @@ impl Taxonomy {
     ///
     /// Add a new node to the tree at the parent provided.
     fn add_node(&mut self, parent_id: &str, tax_id: &str, name: &str, rank: &str) -> PyResult<()> {
+        if self.node(tax_id).is_some() {
+            return Err(PyErr::new::<TaxonomyError, _>(format!("A node with tax id {} already exists", tax_id)));
+        }
         py_try!(self.tax.add(parent_id, tax_id));
         py_try!(self.edit_node(tax_id, Some(name), Some(rank), None, None));
         Ok(())

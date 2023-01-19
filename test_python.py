@@ -361,6 +361,14 @@ class NCBITestCase(unittest.TestCase):
         self.assertEqual(node.name, "Pizzeria")
         self.assertEqual(node.rank, "genus")
 
+    def test_cannot_add_duplicate_tax_id(self):
+        tax = self._create_tax()
+        tax.add_node("561", "563", "Listeria", "species")
+
+        with self.assertRaises(TaxonomyError) as context:
+            tax.add_node("561", "563", "Listeria", "species")
+        self.assertTrue("563" in str(context.exception))
+
     def test_edit_node(self):
         tax = self._create_tax()
         tax.edit_node("562", parent_distance=3)
