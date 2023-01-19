@@ -115,7 +115,7 @@ impl TaxonomyNode {
 /// The Taxonomy object provides the primary interface for exploring a
 /// biological taxonomy.
 #[pyclass]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Taxonomy {
     tax: GeneralTaxonomy,
 }
@@ -209,6 +209,14 @@ impl Taxonomy {
         let mut c = Cursor::new(value);
         let tax = py_try!(phyloxml::load(&mut c));
         Ok(Taxonomy { tax })
+    }
+
+    /// clone(self)
+    /// --
+    ///
+    /// Clone the current taxonomy
+    pub fn clone(&self) -> Taxonomy {
+        Clone::clone(self)
     }
 
     /// to_json_tree(self)
