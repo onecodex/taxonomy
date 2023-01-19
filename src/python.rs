@@ -428,12 +428,13 @@ impl Taxonomy {
         Ok(())
     }
 
-    /// add_node(self, parent_id: str, tax_id: str)
+    /// add_node(self, parent_id: str, tax_id: str, name: str, rank: str)
     /// --
     ///
     /// Add a new node to the tree at the parent provided.
-    fn add_node(&mut self, parent_id: &str, tax_id: &str) -> PyResult<()> {
+    fn add_node(&mut self, parent_id: &str, tax_id: &str, name: &str, rank: &str) -> PyResult<()> {
         py_try!(self.tax.add(parent_id, tax_id));
+        py_try!(self.edit_node(tax_id, Some(name), Some(rank), None, None));
         Ok(())
     }
 

@@ -233,11 +233,11 @@ class NewickTestCase(unittest.TestCase):
 
     def test_add(self):
         tax = self._create_tax()
-        tax.add_node("D", "G")
+        tax.add_node("D", "G", "something", "species")
         node = tax["G"]
         self.assertEqual(node.parent, "D")
 
-        tax.add_node("G", "H")
+        tax.add_node("G", "H", "something else", "species")
         node = tax["H"]
         self.assertEqual(node.parent, "G")
 
@@ -350,12 +350,16 @@ class NCBITestCase(unittest.TestCase):
 
     def test_add(self):
         tax = self._create_tax()
-        tax.add_node("561", "563")
+        tax.add_node("561", "563", "Listeria", "species")
         node = tax["563"]
         self.assertEqual(node.parent, "561")
-        tax.add_node("563", "100000001")
+        self.assertEqual(node.name, "Listeria")
+        self.assertEqual(node.rank, "species")
+        tax.add_node("563", "100000001", "Pizzeria", "genus")
         node = tax["100000001"]
         self.assertEqual(node.parent, "563")
+        self.assertEqual(node.name, "Pizzeria")
+        self.assertEqual(node.rank, "genus")
 
     def test_edit_node(self):
         tax = self._create_tax()
