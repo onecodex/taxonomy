@@ -77,7 +77,10 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
         }
     }
 
-    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None, None)
+    let gt =
+        GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None, None)?;
+    gt.validate_uniqueness()?;
+    Ok(gt)
 }
 
 pub fn save<'t, T: 't, P: AsRef<Path>, X: Taxonomy<'t, T>>(

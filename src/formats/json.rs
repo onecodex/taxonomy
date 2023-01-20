@@ -302,11 +302,13 @@ pub fn load<R: Read>(reader: R, json_pointer: Option<&str>) -> TaxonomyResult<Ge
     };
 
     // determine the JSON type
-    if actual_tax_json.get("nodes").is_some() {
+    let gt = if actual_tax_json.get("nodes").is_some() {
         load_node_link_json(actual_tax_json)
     } else {
         load_tree_json(actual_tax_json)
-    }
+    }?;
+    gt.validate_uniqueness()?;
+    Ok(gt)
 }
 
 pub fn save<'t, W: Write, T: 't, X: Taxonomy<'t, T>>(
