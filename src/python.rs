@@ -1,4 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -78,6 +80,18 @@ pub struct TaxonomyNode {
 
 #[pymethods]
 impl TaxonomyNode {
+    fn __hash__(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.id.hash(&mut hasher);
+        self.name.hash(&mut hasher);
+        self.parent.hash(&mut hasher);
+        self.rank.hash(&mut hasher);
+        for key in self.extra.keys() {
+            key.hash(&mut hasher);
+        }
+        hasher.finish()
+    }
+
     fn __richcmp__(&self, other: PyRef<TaxonomyNode>, op: CompareOp) -> Py<PyAny> {
         let py = other.py();
         match op {
