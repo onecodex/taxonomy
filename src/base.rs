@@ -77,7 +77,7 @@ impl GeneralTaxonomy {
         }
     }
 
-    /// Ensures that all nodes go back to a root and raise an error otherwise
+    /// Ensures that all nodes go back to a root and that tax ids are unique and raise an error otherwise
     fn validate(&self) -> TaxonomyResult<()> {
         if self.parent_ids.is_empty() {
             return Ok(());
@@ -107,6 +107,37 @@ impl GeneralTaxonomy {
             }
 
             nodes_ok.extend(evaluated);
+        }
+
+        Ok(())
+    }
+
+    /// Ensures that tax ids are unique.
+    /// This is not useful for all kind of taxonomies since some format have optional ids.
+    pub fn validate_uniqueness(&self) -> TaxonomyResult<()> {
+        if self.tax_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tax_ids = self.tax_ids.clone();
+        tax_ids.sort_unstable();
+        let mut dupes = HashSet::new();
+        let mut last = tax_ids.get(0).unwrap();
+
+        for i in 1..tax_ids.len() {
+            let cur = tax_ids.get(i).unwrap();
+            if cur == last {
+                dupes.insert(cur);
+                continue;
+            }
+            last = cur;
+        }
+
+        if !dupes.is_empty() {
+            return Err(Error::new(ErrorKind::InvalidTaxonomy(format!(
+                "Some tax ids are duplicated: {:?}.",
+                dupes.iter().collect::<Vec<_>>()
+            ))));
         }
 
         Ok(())
@@ -491,6 +522,26 @@ mod tests {
         assert_eq!(
             res.unwrap_err().kind,
             ErrorKind::InvalidTaxonomy("Cycle detected in taxonomy".to_owned())
+        );
+    }
+
+    #[test]
+    fn can_validate_uniqueness() {
+        let example = r#"{
+            "nodes": [
+                {"id": "1", "name": "root", "readcount": 1000},
+                {"id": "1", "name": "Bacteria", "rank": "no rank", "readcount": 1000}
+            ],
+            "links": [
+                {"source": 1, "target": 0}
+            ]
+        }"#;
+
+        let res = load(Cursor::new(example), None);
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err().kind,
+            ErrorKind::InvalidTaxonomy("Some tax ids are duplicated: [\"1\"].".to_owned())
         );
     }
 }

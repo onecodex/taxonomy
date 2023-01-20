@@ -71,14 +71,16 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
         }
     }
 
-    GeneralTaxonomy::from_arrays(
+    let gt = GeneralTaxonomy::from_arrays(
         tax_names.clone(),
         parent_ids,
         Some(tax_names),
         Some(tax_ranks),
         None,
         None,
-    )
+    )?;
+    gt.validate_uniqueness()?;
+    Ok(gt)
 }
 
 #[cfg(test)]
