@@ -290,12 +290,13 @@ impl Taxonomy {
     ///
     /// Find a node by its name, Raises an exception if not found.
     fn find_all_by_name(&self, name: &str) -> PyResult<Vec<TaxonomyNode>> {
-        Ok(self
+        let res = self
             .tax
             .find_all_by_name(name)
-            .iter()
-            .map(|tax_id| self.as_node(tax_id).unwrap())
-            .collect::<Vec<TaxonomyNode>>())
+            .into_iter()
+            .map(|tax_id| self.as_node(tax_id))
+            .collect::<PyResult<Vec<TaxonomyNode>>>()?;
+        Ok(res)
     }
 
     /// parent_with_distance(self, tax_id: str, /, at_rank: str)
@@ -345,22 +346,24 @@ impl Taxonomy {
     /// children(self, tax_id: str)
     /// --
     ///
-    /// Return a list of child taxonomy nodes from the node id provided.
+    /// Return a list of direct child taxonomy nodes from the node id provided.
     fn children(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
-        let children: Vec<&str> = py_try!(self.tax.children(tax_id));
-        let mut res = Vec::with_capacity(children.len());
-        for key in children {
-            let child = self.node(key);
-            if let Some(c) = child {
-                res.push(c);
-            } else {
-                return Err(PyErr::new::<TaxonomyError, _>(format!(
-                    "Node {} is missing in children",
-                    key
-                )));
-            }
-        }
+        let res = py_try!(self.tax.children(tax_id))
+            .into_iter()
+            .map(|tax_id| self.as_node(tax_id))
+            .collect::<PyResult<Vec<TaxonomyNode>>>()?;
+        Ok(res)
+    }
 
+    /// descendants(self, tax_id: str)
+    /// --
+    ///
+    /// Return a list of all child taxonomy nodes from the node id provided.
+    fn descendants(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
+        let res = py_try!(self.tax.descendants(tax_id))
+            .into_iter()
+            .map(|tax_id| self.as_node(tax_id))
+            .collect::<PyResult<Vec<TaxonomyNode>>>()?;
         Ok(res)
     }
 
@@ -370,20 +373,10 @@ impl Taxonomy {
     /// Return a list of all the parent taxonomy nodes of the node id provided
     /// (including that node itself).
     fn lineage(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
-        let lineage: Vec<&str> = py_try!(self.tax.lineage(tax_id));
-        let mut res = Vec::with_capacity(lineage.len());
-        for key in lineage {
-            let ancestor = self.node(key);
-            if let Some(a) = ancestor {
-                res.push(a);
-            } else {
-                return Err(PyErr::new::<TaxonomyError, _>(format!(
-                    "Node {} is missing in lineage",
-                    key
-                )));
-            }
-        }
-
+        let res = py_try!(self.tax.lineage(tax_id))
+            .into_iter()
+            .map(|tax_id| self.as_node(tax_id))
+            .collect::<PyResult<Vec<TaxonomyNode>>>()?;
         Ok(res)
     }
 
