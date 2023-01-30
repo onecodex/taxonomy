@@ -15,8 +15,11 @@ where
     /// Returns the root node of the entire tree.
     fn root(&'t self) -> T;
 
-    /// Returns a [Vec] of all the child IDs of the given tax_id.
+    /// Returns a [Vec] of all the direct children IDs of the given tax_id.
     fn children(&'t self, tax_id: T) -> TaxonomyResult<Vec<T>>;
+
+    /// Returns a [Vec] of all the children IDs of the given tax_id.
+    fn descendants(&'t self, tax_id: T) -> TaxonomyResult<Vec<T>>;
 
     /// Returns the parent of the given taxonomic node and the distance to said parent.
     /// The parent of the root node will return [None].
@@ -208,6 +211,17 @@ pub(crate) mod tests {
             })
         }
 
+        fn descendants(&'t self, tax_id: u32) -> TaxonomyResult<Vec<u32>> {
+            let children: HashSet<u32> = self
+                .traverse(tax_id)?
+                .map(|(n, _)| n)
+                .filter(|n| *n != tax_id)
+                .collect();
+            let mut children: Vec<u32> = children.into_iter().collect();
+            children.sort_unstable();
+            Ok(children)
+        }
+
         fn parent(&self, tax_id: u32) -> TaxonomyResult<Option<(u32, f32)>> {
             Ok(match tax_id {
                 131567 => Some((1, 1.)),
@@ -263,6 +277,15 @@ pub(crate) mod tests {
         assert_eq!(tax.root(), 1);
         assert_eq!(tax.len(), 14);
         assert_eq!(tax.is_empty(), false);
+    }
+
+    #[test]
+    fn test_descendants() {
+        let tax = MockTax;
+        assert_eq!(
+            tax.descendants(2).unwrap(),
+            vec![22, 1046, 1224, 1236, 53452, 56812, 61598, 62322, 135613, 135622, 765909]
+        );
     }
 
     #[test]

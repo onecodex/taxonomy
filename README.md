@@ -110,7 +110,12 @@ In NCBI, it only accounts for *scientific names* and not synonyms.
 
 #### `tax.children(tax_id: str) -> List[TaxonomyNode]`
 
-Returns all nodes below the given tax id.
+Returns all direct nodes below the given tax id.
+
+#### `tax.descendants(tax_id: str) -> List[TaxonomyNode]`
+
+Returns all nodes below the given tax id. 
+Equivalent to running `tax.children` recursively on the initial result of `tax.children(tax_id)`.
 
 #### `tax.lineage(tax_id: str) -> List[TaxonomyNode]`
 

@@ -324,6 +324,17 @@ impl<'t> Taxonomy<'t, &'t str> for GeneralTaxonomy {
             .collect()
     }
 
+    fn descendants(&'t self, tax_id: &'t str) -> TaxonomyResult<Vec<&'t str>> {
+        let children: HashSet<&str> = self
+            .traverse(tax_id)?
+            .map(|(n, _)| n)
+            .filter(|t| *t != tax_id)
+            .collect();
+        let mut children: Vec<&str> = children.into_iter().collect();
+        children.sort_unstable();
+        Ok(children)
+    }
+
     fn parent(&'t self, tax_id: &str) -> TaxonomyResult<Option<(&'t str, f32)>> {
         let idx = self.to_internal_index(tax_id)?;
         if idx == 0 {
@@ -375,6 +386,15 @@ impl<'t> Taxonomy<'t, InternalIndex> for GeneralTaxonomy {
         } else {
             Err(Error::new(ErrorKind::NoSuchInternalIndex(tax_id)))
         }
+    }
+
+    fn descendants(&'t self, tax_id: InternalIndex) -> TaxonomyResult<Vec<InternalIndex>> {
+        let children: HashSet<InternalIndex> = self
+            .traverse(tax_id)?
+            .map(|(n, _)| n)
+            .filter(|n| *n != tax_id)
+            .collect();
+        Ok(children.into_iter().collect())
     }
 
     fn parent(&'t self, idx: InternalIndex) -> TaxonomyResult<Option<(InternalIndex, f32)>> {
@@ -452,6 +472,10 @@ mod tests {
         let tax = create_test_taxonomy();
         assert_eq!(Taxonomy::<&str>::len(&tax), 6);
         assert_eq!(tax.children("1").unwrap(), vec!["2", "1000", "101", "102"]);
+        assert_eq!(
+            tax.descendants("1").unwrap(),
+            vec!["1000", "101", "102", "2", "562"]
+        );
         assert_eq!(tax.name("562").unwrap(), "Escherichia coli");
         assert_eq!(tax.rank("562").unwrap(), TaxRank::Species);
         assert_eq!(tax.parent("562").unwrap(), Some(("2", 1.0)));
