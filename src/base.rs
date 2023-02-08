@@ -113,7 +113,7 @@ impl GeneralTaxonomy {
     }
 
     /// Ensures that tax ids are unique.
-    /// This is not useful for all kind of taxonomies since some format have optional ids.
+    /// This is not useful for all kinds of taxonomies since some formats have optional ids.
     pub fn validate_uniqueness(&self) -> TaxonomyResult<()> {
         if self.tax_ids.is_empty() {
             return Ok(());
