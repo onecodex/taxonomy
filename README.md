@@ -183,7 +183,7 @@ maturin build --features python --release --strip
 
 # The linux build requires switching through different python versions and linux compatibility targets.
 # For example, to build for Python 3.10 and manylinux2010 compatibility:
-docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin:main build --features=python --release --strip --interpreter=python3.10 --compatibility=manylinux2010
+docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin:main build --features=python --release --strip --interpreter=python3.10
 
 # Upload the wheels to PyPI:
 twine upload target/wheels/*
