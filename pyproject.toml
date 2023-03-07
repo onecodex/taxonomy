@@ -1,6 +1,12 @@
 [build-system]
-requires = ["maturin>=0.11,<0.12"]
+requires = ["maturin>=0.14,<0.15"]
 build-backend = "maturin"
 
-[tool.maturin]
-cargo-extra-args="--features=python"
+[project]
+name = "taxonomy"
+classifier = [
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
