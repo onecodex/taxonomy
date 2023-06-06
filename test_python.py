@@ -139,6 +139,18 @@ class JsonTestCase(unittest.TestCase):
             sorted([n.id for n in self.tax.find_all_by_name("species 1.1")]), ["10", "12"]
         )
 
+    def test_edit_node_parent_updates_children(self):
+        assert self.tax["5"].parent == "4"
+
+        # original parent = 4
+        self.tax.edit_node("5", parent_id="1")
+
+        node = self.tax["5"]
+        assert node.parent == "1"
+
+        assert "5" not in {n.id for n in self.tax.children("4")}
+        assert "5" in {n.id for n in self.tax.children("1")}
+
 
 class NewickTestCase(unittest.TestCase):
     def _create_tax(self):

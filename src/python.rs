@@ -491,6 +491,9 @@ impl Taxonomy {
             self.tax.parent_distances[idx] = p;
         }
 
+        // update cache
+        self.tax.index();
+
         Ok(())
     }
 

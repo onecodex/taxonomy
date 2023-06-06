@@ -56,7 +56,7 @@ impl GeneralTaxonomy {
     /// calls this), but it's possible that a user might want to save
     /// memory/start-up time so it's theoretically possible to use this
     /// struct without running this.
-    fn index(&mut self) {
+    pub fn index(&mut self) {
         self.tax_id_lookup.clear();
         for (ix, tax_id) in self.tax_ids.iter().enumerate() {
             self.tax_id_lookup.insert(tax_id.clone(), ix);
