@@ -125,7 +125,7 @@ class JsonTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.tax = self._create_tax()
 
-    def test_asdf(self):
+    def test_internal_index(self):
         self.assertEqual(
             [
                 self.tax.internal_index(x)
