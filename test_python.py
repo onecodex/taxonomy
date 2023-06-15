@@ -151,6 +151,12 @@ class JsonTestCase(unittest.TestCase):
         assert "5" not in {n.id for n in self.tax.children("4")}
         assert "5" in {n.id for n in self.tax.children("1")}
 
+    def test_prune_works_after_editing_tree(self):
+        tax = self.tax.clone()
+        tax.edit_node("5", parent_id="1")
+        pruned = tax.prune(keep=["5"])
+        assert pruned["5"].parent == "1"
+
 
 class NewickTestCase(unittest.TestCase):
     def _create_tax(self):
