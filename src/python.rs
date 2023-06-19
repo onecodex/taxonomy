@@ -489,12 +489,10 @@ impl Taxonomy {
             self.tax.parent_ids[idx] = py_try!(self.tax.to_internal_index(p));
 
             // remove current node from children lookup for old parent
-            // TODO: assert that exactly one item was removed?
-            // assumes values are sorted!
-            match self.tax.children_lookup[old_parent_idx].binary_search(&idx) {
-                Ok(removal_index) => self.tax.children_lookup[old_parent_idx].remove(removal_index),
-                Err(_) => todo!(),
-            };
+            let removal_index = self.tax.children_lookup[old_parent_idx]
+                .binary_search(&idx)
+                .unwrap();
+            self.tax.children_lookup[old_parent_idx].remove(removal_index);
 
             self.tax.children_lookup[old_parent_idx].sort_unstable();
 
