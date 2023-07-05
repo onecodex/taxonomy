@@ -481,7 +481,24 @@ impl Taxonomy {
                     "Node can not be moved to its child",
                 ));
             }
+
+            let old_parent_idx = self.tax.parent_ids[idx];
+            let new_parent_idx = py_try!(self.tax.to_internal_index(p));
+
+            // update id to parent_id
             self.tax.parent_ids[idx] = py_try!(self.tax.to_internal_index(p));
+
+            // remove current node from children lookup for old parent
+            let removal_index = self.tax.children_lookup[old_parent_idx]
+                .binary_search(&idx)
+                .unwrap();
+            self.tax.children_lookup[old_parent_idx].remove(removal_index);
+
+            self.tax.children_lookup[old_parent_idx].sort_unstable();
+
+            // add idx as a child of new parent idx
+            self.tax.children_lookup[new_parent_idx].push(idx);
+            self.tax.children_lookup[new_parent_idx].sort_unstable();
         }
 
         if let Some(p) = parent_distance {

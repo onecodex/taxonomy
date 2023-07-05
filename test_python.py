@@ -125,7 +125,7 @@ class JsonTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.tax = self._create_tax()
 
-    def test_asdf(self):
+    def test_internal_index(self):
         self.assertEqual(
             [
                 self.tax.internal_index(x)
@@ -138,6 +138,24 @@ class JsonTestCase(unittest.TestCase):
         self.assertEqual(
             sorted([n.id for n in self.tax.find_all_by_name("species 1.1")]), ["10", "12"]
         )
+
+    def test_edit_node_parent_updates_children(self):
+        assert self.tax["5"].parent == "4"
+
+        # original parent = 4
+        self.tax.edit_node("5", parent_id="1")
+
+        node = self.tax["5"]
+        assert node.parent == "1"
+
+        assert "5" not in {n.id for n in self.tax.children("4")}
+        assert "5" in {n.id for n in self.tax.children("1")}
+
+    def test_prune_works_after_editing_tree(self):
+        tax = self.tax.clone()
+        tax.edit_node("5", parent_id="1")
+        pruned = tax.prune(keep=["5"])
+        assert pruned["5"].parent == "1"
 
 
 class NewickTestCase(unittest.TestCase):
