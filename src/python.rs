@@ -272,7 +272,7 @@ impl Taxonomy {
         py_try!(newick::save(
             &mut bytes,
             &self.tax,
-            Some(TaxonomyTrait::<InternalIndex>::root(&self.tax))
+            Some(TaxonomyTrait::<&str>::root(&self.tax))
         ));
         Ok(PyBytes::new(py, &bytes).into())
     }
