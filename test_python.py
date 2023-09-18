@@ -278,6 +278,12 @@ class NewickTestCase(unittest.TestCase):
         self.assertIsNotNone(tax2.node("E"))
         self.assertEqual(len(tax2), 6)
 
+    def test_output_uses_tax_ids(self):
+        res = self.tax.to_newick().decode("utf-8")
+
+        for tax_id in ["A", "B", "C", "D", "E", "F"]:
+            assert tax_id in res
+
 
 class NCBITestCase(unittest.TestCase):
     def _create_tax(self):
