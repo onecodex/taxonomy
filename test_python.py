@@ -160,7 +160,7 @@ class JsonTestCase(unittest.TestCase):
 
     def test_to_json_tree(self):
         small_tax = self.tax.prune(remove=[str(i) for i in range(3, 12)])
-        actual = json.loads(small_tax.to_json_tree().decode())
+        actual = json.loads(small_tax.to_json_tree())
         expected = {
             "id": "1",
             "name": "root",
@@ -180,6 +180,18 @@ class JsonTestCase(unittest.TestCase):
         empty_tax = self.tax.prune(keep=[])
         with self.assertRaises(TaxonomyError):
             empty_tax.to_json_tree()
+
+    def test_to_json_node_links_empty_tree(self):
+        empty_tax = self.tax.prune(keep=[])
+        actual = json.loads(empty_tax.to_json_node_links())
+        expected = {
+            "directed": True,
+            "graph": [],
+            "links": [],
+            "multigraph": False,
+            "nodes": [],
+        }
+        self.assertEqual(actual, expected)
 
 
 class NewickTestCase(unittest.TestCase):
