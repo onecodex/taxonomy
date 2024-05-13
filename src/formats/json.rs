@@ -320,7 +320,13 @@ pub fn save<'t, W: Write, T: 't, X: Taxonomy<'t, T>>(
 where
     T: Clone + Debug + Display + Eq + Hash + PartialEq,
 {
-    let root_node = root_node.unwrap_or_else(|| taxonomy.root());
+    // Defaults to root but root exists only if taxonomy is not empty.
+    let root_node = root_node.or(if taxonomy.is_empty() {
+        None
+    } else {
+        Some(taxonomy.root())
+    });
+
     let json_data = match format {
         JsonFormat::NodeLink => serialize_as_node_links(taxonomy, root_node),
         JsonFormat::Tree => serialize_as_tree(taxonomy, root_node),
@@ -332,11 +338,15 @@ where
 
 fn serialize_as_tree<'t, T: 't>(
     taxonomy: &'t impl Taxonomy<'t, T>,
-    tax_id: T,
+    root_node: Option<T>,
 ) -> TaxonomyResult<Value>
 where
     T: Clone + Debug + Display + Eq + Hash + PartialEq,
 {
+    let tax_id = root_node.ok_or(Error::new(ErrorKind::InvalidTaxonomy(
+        "Taxonomy must have a root node.".to_string(),
+    )))?;
+
     fn inner<'t, T: 't>(tax: &'t impl Taxonomy<'t, T>, tax_id: T) -> TaxonomyResult<TaxNodeTree>
     where
         T: Clone + Debug + Display + Eq + Hash + PartialEq,
@@ -360,7 +370,7 @@ where
 
 fn serialize_as_node_links<'t, T: 't>(
     tax: &'t impl Taxonomy<'t, T>,
-    root_id: T,
+    root_node: Option<T>,
 ) -> TaxonomyResult<Value>
 where
     T: Clone + Debug + Display + Eq + Hash + PartialEq,
@@ -369,20 +379,22 @@ where
     let mut links = Vec::new();
     let mut id_to_idx = HashMap::new();
 
-    for (ix, (tid, _pre)) in tax.traverse(root_id)?.filter(|x| x.1).enumerate() {
-        let node = TaxNode {
-            id: tid.to_string(),
-            name: tax.name(tid.clone())?.to_string(),
-            rank: tax.rank(tid.clone())?,
-            extra: (*tax.data(tid.clone())?).clone(),
-        };
-        nodes.push(to_value(&node).unwrap());
-        id_to_idx.insert(tid.clone(), ix);
-        if let Some(parent_id) = tax.parent(tid)? {
-            links.push(json!({
-                "source": ix,
-                "target": id_to_idx[&parent_id.0],
-            }));
+    if let Some(root_id) = root_node {
+        for (ix, (tid, _pre)) in tax.traverse(root_id)?.filter(|x| x.1).enumerate() {
+            let node = TaxNode {
+                id: tid.to_string(),
+                name: tax.name(tid.clone())?.to_string(),
+                rank: tax.rank(tid.clone())?,
+                extra: (*tax.data(tid.clone())?).clone(),
+            };
+            nodes.push(to_value(&node).unwrap());
+            id_to_idx.insert(tid.clone(), ix);
+            if let Some(parent_id) = tax.parent(tid)? {
+                links.push(json!({
+                    "source": ix,
+                    "target": id_to_idx[&parent_id.0],
+                }));
+            }
         }
     }
 
@@ -405,10 +417,20 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn can_load_empty_node_link_format() {
+    fn can_load_and_save_empty_node_link_format() {
+        // Savings
         let example = r#"{"nodes": [], "links": []}"#;
         let tax = load(Cursor::new(example), None).unwrap();
         assert_eq!(Taxonomy::<&str>::len(&tax), 0);
+
+        // Loading
+        let mut out = Vec::new();
+        save::<_, &str, _>(&mut out, &tax, JsonFormat::NodeLink, None).unwrap();
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            json!({ "nodes": [], "links": [], "directed": true, "multigraph": false, "graph": [] })
+                .to_string()
+        )
     }
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -445,7 +467,7 @@ mod tests {
             1000
         );
         // Converting to Value should give us the same data
-        let serialized = serialize_as_node_links(&tax, Taxonomy::<&str>::root(&tax)).unwrap();
+        let serialized = serialize_as_node_links(&tax, Some(Taxonomy::<&str>::root(&tax))).unwrap();
 
         let tax2 = load_node_link_json(&serialized).unwrap();
         assert_eq!(Taxonomy::<&str>::len(&tax2), 3);
@@ -503,7 +525,7 @@ mod tests {
             1000
         );
         // Converting to Value should give us the same data
-        let serialized = serialize_as_tree(&tax, Taxonomy::<&str>::root(&tax)).unwrap();
+        let serialized = serialize_as_tree(&tax, Some(Taxonomy::<&str>::root(&tax))).unwrap();
         let input_val: TaxNodeTree = from_str(&example).unwrap();
         assert_eq!(serialized, to_value(&input_val).unwrap());
     }

@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from taxonomy import Taxonomy, TaxonomyError
@@ -156,6 +157,41 @@ class JsonTestCase(unittest.TestCase):
         tax.edit_node("5", parent_id="1")
         pruned = tax.prune(keep=["5"])
         assert pruned["5"].parent == "1"
+
+    def test_to_json_tree(self):
+        small_tax = self.tax.prune(remove=[str(i) for i in range(3, 12)])
+        actual = json.loads(small_tax.to_json_tree())
+        expected = {
+            "id": "1",
+            "name": "root",
+            "rank": "no rank",
+            "children": [
+                {
+                    "id": "2",
+                    "name": "superkingdom 1",
+                    "rank": "superkingdom",
+                    "children": [],
+                }
+            ],
+        }
+        self.assertEqual(actual, expected)
+
+    def test_to_json_tree_with_empty_tree(self):
+        empty_tax = self.tax.prune(keep=[])
+        with self.assertRaises(TaxonomyError):
+            empty_tax.to_json_tree()
+
+    def test_to_json_node_links_empty_tree(self):
+        empty_tax = self.tax.prune(keep=[])
+        actual = json.loads(empty_tax.to_json_node_links())
+        expected = {
+            "directed": True,
+            "graph": [],
+            "links": [],
+            "multigraph": False,
+            "nodes": [],
+        }
+        self.assertEqual(actual, expected)
 
 
 class NewickTestCase(unittest.TestCase):
