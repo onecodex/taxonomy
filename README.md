@@ -140,7 +140,7 @@ Return a copy of the taxonomy containing:
 
 Remove the node from the tree, re-attaching parents as needed: only a single node is removed.
 
-#### `tax.add_node(parent_tax_id: str, new_tax_id: str)`
+#### `tax.add_node(parent_tax_id: str, new_tax_id: str, /, name: str, rank: str)`
 
 Add a new node to the tree at the parent provided.
 
