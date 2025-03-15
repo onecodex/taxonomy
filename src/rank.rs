@@ -239,7 +239,7 @@ impl FromStr for TaxRank {
             "breed" => Ok(TaxRank::Breed),
             "strain" => Ok(TaxRank::Strain),
             "serogroup" => Ok(TaxRank::SeroGroup),
-            "no rank" => Ok(TaxRank::Unspecified),
+            "no rank" | "no_rank" => Ok(TaxRank::Unspecified),
             "biotype" => Ok(TaxRank::Biotype),
             "clade" => Ok(TaxRank::Clade),
             "forma specialis" => Ok(TaxRank::FormaSpecialis),
