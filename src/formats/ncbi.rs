@@ -127,6 +127,7 @@ mod tests {
     fn can_import_ncbi() {
         let nodes =
             "1\t|\t1\t|\tno rank\t|\t\t|\t8\t|\t0\t|\t1\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|
+    10239\t|\t1\t|\tno_rank\t|\t\t|\t9\t|\t0\t|\t1\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|
     2\t|\t131567\t|\tsuperkingdom\t|\t\t|\t0\t|\t0\t|\t11\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|
     543\t|\t91347\t|\tfamily\t|\t\t|\t0\t|\t1\t|\t11\t|\t1\t|\t0\t|\t1\t|\t0\t|\t0\t|\t\t|
     561\t|\t543\t|\tgenus\t|\t\t|\t0\t|\t1\t|\t11\t|\t1\t|\t0\t|\t1\t|\t0\t|\t0\t|\t\t|
@@ -137,6 +138,7 @@ mod tests {
     131567\t|\t1\t|\tno rank\t|\t\t|\t8\t|\t1\t|\t1\t|\t1\t|\t0\t|\t1\t|\t1\t|\t0\t|\t\t|";
         let names = "1\t|\tall\t|\t\t|\tsynonym\t|
     1\t|\troot\t|\t\t|\tscientific name\t|
+    10239\t|\tViruses\t|\t\t|\tscientific name\t|
     2\t|\tBacteria\t|\tBacteria <prokaryotes>\t|\tscientific name\t|
     543\t|\tEnterobacteriaceae\t|\t\t|\tscientific name\t|
     561\t|\tEscherchia\t|\t\t|\tmisspelling\t|
