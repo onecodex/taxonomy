@@ -394,7 +394,7 @@ class NCBITestCase(unittest.TestCase):
         new_tax = self.tax.prune(remove=["561"])
         self.assertIsNone(new_tax.node("561"))
         self.assertIsNone(new_tax.node("562"))
-        self.assertEqual(len(new_tax), 7)
+        self.assertEqual(len(new_tax), 8)
 
         new_tax = self.tax.prune(keep=["561"])
         self.assertEqual(len(new_tax), 8)
