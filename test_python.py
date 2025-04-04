@@ -2,6 +2,9 @@ import json
 import unittest
 
 from taxonomy import Taxonomy, TaxonomyError
+from downloads import download
+import os
+import subprocess
 
 JSON_DATA = """
 {
@@ -485,6 +488,16 @@ class GtdbTestCase(unittest.TestCase):
         with open("tests/data/gtdb_invalid.tsv") as file:
             with self.assertRaises(TaxonomyError):
                 Taxonomy.from_gtdb(file.read())
+
+
+class LatestNCBITestCase(unittest.TestCase):
+    @unittest.skipUnless(
+        os.getenv("TAXONOMY_TEST_NCBI"), "Define TAXONOMY_TEST_NCBI to run NCBI test"
+    )
+    def test_load_latest_ncbi_taxonomy(self):
+        download("https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz")
+        subprocess.check_output(["tar", "-zxvf", "taxdump.tar.gz"])
+        Taxonomy.from_ncbi(".")
 
 
 if __name__ == "__main__":

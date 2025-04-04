@@ -15,6 +15,8 @@ use crate::errors::{Error, ErrorKind, TaxonomyResult};
 #[non_exhaustive]
 pub enum TaxRank {
     Domain,
+    AcellularRoot,
+    CellularRoot,
     Subdomain,
     Realm,
     Subrealm,
@@ -113,6 +115,8 @@ impl TaxRank {
     pub fn to_ncbi_rank(self) -> &'static str {
         match self {
             TaxRank::Superkingdom => "superkingdom",
+            TaxRank::AcellularRoot => "acellular root",
+            TaxRank::CellularRoot => "cellular root",
             TaxRank::Kingdom => "kingdom",
             TaxRank::Subkingdom => "subkingdom",
             TaxRank::Superphylum => "superphylum",
@@ -170,6 +174,8 @@ impl FromStr for TaxRank {
             "domain" | "regio" => Ok(TaxRank::Domain),
             "subdomain" => Ok(TaxRank::Subdomain),
             "realm" => Ok(TaxRank::Realm),
+            "acellular root" => Ok(TaxRank::AcellularRoot),
+            "cellular root" => Ok(TaxRank::CellularRoot),
             "subrealm" => Ok(TaxRank::Subrealm),
             "hyperkingdom" | "hyperregnum" => Ok(TaxRank::Hyperkingdom),
             "superkingdom" | "superregnum" => Ok(TaxRank::Superkingdom),
@@ -257,6 +263,8 @@ impl fmt::Display for TaxRank {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let rank_str = match self {
             TaxRank::Domain => "domain",
+            TaxRank::AcellularRoot => "acellular root",
+            TaxRank::CellularRoot => "cellular root",
             TaxRank::Subdomain => "subdomain",
             TaxRank::Realm => "realm",
             TaxRank::Subrealm => "subrealm",
@@ -357,6 +365,7 @@ mod test {
 
     static RANKS: &[super::TaxRank] = &[
         Domain,
+        AcellularRoot,
         Subdomain,
         Realm,
         Subrealm,

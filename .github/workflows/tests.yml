@@ -49,7 +49,7 @@ jobs:
         run: |
           python3 -m venv venv
           . venv/bin/activate
-          pip3 install maturin
+          pip3 install maturin downloads
           pip3 show maturin
 
       - name: add library to venv
