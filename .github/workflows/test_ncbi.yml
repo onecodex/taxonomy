@@ -38,4 +38,4 @@ jobs:
       - name: Test Python bindings with latest NCBI taxonomy
         run: |
           . venv/bin/activate
-          python test_ncbi.py
+          TAXONOMY_TEST_NCBI=true python test_ncbi.py
