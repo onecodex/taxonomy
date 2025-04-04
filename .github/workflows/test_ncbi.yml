@@ -1,0 +1,41 @@
+name: Test Latest NCBI Taxonomy
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  schedule:
+    - cron: '0 0 1 * *' # runs at 00:00 on the 1st of every month (UTC)
+
+jobs:
+  test-ncbi-python-bindings:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Install python headers
+        run: sudo apt-get update && sudo apt-get install python3-dev python3-pip python3-venv
+
+      - name: Install python dependencies
+        run: |
+          python3 -m venv venv
+          . venv/bin/activate
+          pip3 install maturin downloads
+          pip3 show maturin
+
+      - name: Add library to venv
+        run: |
+          . venv/bin/activate
+          maturin develop --features=python
+
+      - name: Test Python bindings with latest NCBI taxonomy
+        run: |
+          . venv/bin/activate
+          python test_ncbi.py
