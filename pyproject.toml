@@ -13,4 +13,5 @@ classifier = [
 ]
 
 [tool.maturin]
+bindings = "pyo3"
 features = [ "python" ]
