@@ -177,14 +177,19 @@ pip install .
 
 #### Building binary wheels and pushing to PyPI
 
+There is a Github Workflow that will build Python wheels for macOS (x86 and
+ARM) and Ubuntu (x86). To run, create a new release.
+
+To build wheels locally, run:
+
 ```
-# The Mac build requires switching through a few different python versions
-maturin build --features python --release --strip
+uv venv --python 3.11 #
+source .venv/bin/activate
+uv build
 
-docker run --rm -v $(pwd):/io ghcr.io/pyo3/maturin:main build --features=python --release --strip -f
+# or, using maturin by itself:
 
-# Upload the wheels to PyPI:
-twine upload target/wheels/*
+maturin build --features python --release --strip^
 ```
 
 ## Other Taxonomy Libraries

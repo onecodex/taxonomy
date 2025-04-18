@@ -11,3 +11,7 @@ classifier = [
     "License :: OSI Approved :: MIT License",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
+
+[tool.maturin]
+bindings = "pyo3"
+features = [ "python" ]
