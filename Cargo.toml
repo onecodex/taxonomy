@@ -1,6 +1,6 @@
 [package]
 name = "taxonomy"
-version = "0.10.0"
+version = "0.10.1"
 authors = ["Vincent Prouillet <vincent@onecodex.com>"]
 description = "Routines for loading, saving, and manipulating taxonomic trees"
 keywords = ["taxonomy", "bioinformatics"]
