@@ -49,7 +49,7 @@ jobs:
         run: |
           python3 -m venv venv
           . venv/bin/activate
-          pip3 install maturin downloads
+          pip3 install maturin downloads pytest
           pip3 show maturin
 
       - name: add library to venv
@@ -60,7 +60,7 @@ jobs:
       - name: Run the python tests
         run: |
           . venv/bin/activate
-          python test_python.py
+          pytest
 
       - name: compile taxonomy with python bindings in release mode
         run: |
