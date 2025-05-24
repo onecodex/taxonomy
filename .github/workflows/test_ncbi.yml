@@ -27,7 +27,7 @@ jobs:
         run: |
           python3 -m venv venv
           . venv/bin/activate
-          pip3 install maturin downloads
+          pip3 install maturin downloads pytest
           pip3 show maturin
 
       - name: Add library to venv
@@ -38,4 +38,4 @@ jobs:
       - name: Test Python bindings with latest NCBI taxonomy
         run: |
           . venv/bin/activate
-          TAXONOMY_TEST_NCBI=true python -m unittest test_python.LatestNCBITestCase.test_load_latest_ncbi_taxonomy
+          TAXONOMY_TEST_NCBI=true pytest test_python::test_latestncbi_load_latest_ncbi_taxonomy
