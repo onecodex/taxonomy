@@ -121,9 +121,6 @@ JSON_DATA = """
   ]
 }        """
 
-
-# ---- Consolidated pytest fixtures ----
-
 @pytest.fixture
 def json_tax():
     return Taxonomy.from_json(JSON_DATA)
@@ -294,39 +291,35 @@ def test_newick_prune(newick_tax):
 
 
 def test_newick_remove(newick_tax):
-    tax = Taxonomy.from_newick("(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;")
-    tax.remove_node("E")
-    assert tax.node("D") is not None
-    assert tax.node("E") is None
-    assert len(tax) == 5
+    newick_tax.remove_node("E")
+    assert newick_tax.node("D") is not None
+    assert newick_tax.node("E") is None
+    assert len(newick_tax) == 5
 
 
 def test_newick_add(newick_tax):
-    tax = Taxonomy.from_newick("(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;")
-    tax.add_node("D", "G", "something", "species")
-    node = tax["G"]
+    newick_tax.add_node("D", "G", "something", "species")
+    node = newick_tax["G"]
     assert node.parent == "D"
 
-    tax.add_node("G", "H", "something else", "species")
-    node = tax["H"]
+    newick_tax.add_node("G", "H", "something else", "species")
+    node = newick_tax["H"]
     assert node.parent == "G"
 
 
 def test_newick_edit_node(newick_tax):
-    tax = Taxonomy.from_newick("(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;")
-    tax.edit_node("D", parent_distance=3)
-    node, distance = tax.parent_with_distance("D")
+    newick_tax.edit_node("D", parent_distance=3)
+    node, distance = newick_tax.parent_with_distance("D")
     assert distance == 3
 
 
 def test_newick_can_clone(newick_tax):
-    tax = Taxonomy.from_newick("(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;")
-    tax2 = tax.clone()
-    tax.remove_node("E")
+    tax2 = newick_tax.clone()
+    newick_tax.remove_node("E")
 
-    assert tax.node("D") is not None
-    assert tax.node("E") is None
-    assert len(tax) == 5
+    assert newick_tax.node("D") is not None
+    assert newick_tax.node("E") is None
+    assert len(newick_tax) == 5
 
     assert tax2.node("D") is not None
     assert tax2.node("E") is not None
