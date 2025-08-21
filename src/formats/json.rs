@@ -12,13 +12,12 @@ use crate::Taxonomy;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, to_value, to_writer, Value};
 
-
 /// We can handle 2 kinds of JSON formats:
 /// 1. The Node Link format
 /// 2. The Tree format
 ///
 /// The Node Link Format:
-/// 
+///
 /// The taxonomy is represented as a directed acyclic graph (DAG) in JSON using a node-link
 /// structure:
 /// ```json
@@ -40,13 +39,13 @@ use serde_json::{json, to_value, to_writer, Value};
 ///   ]
 /// }
 /// ```
-/// 
+///
 /// nodes:
 /// A list of taxonomic units. Each node has:
 ///   id – unique integer identifier
 ///   name – the scientific name or placeholder label
 ///   rank – the taxonomic rank (e.g., "species", "genus", "family")
-/// 
+///
 /// links:
 /// A list of directed edges between nodes. Each link has:
 ///   source – the child node’s index in the nodes array
@@ -56,7 +55,7 @@ use serde_json::{json, to_value, to_writer, Value};
 ///
 /// In the tree format, child nodes are nested within their parent node. This format is more
 /// natural as the taxonomic structure is immediately apparent from reading it.
-/// 
+///
 /// ```json
 /// {
 ///     "id": "1",
