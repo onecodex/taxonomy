@@ -13,16 +13,49 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, to_value, to_writer, Value};
 
 /// We can handle 2 kinds of JSON formats:
-/// 1. the node link format
-/// 2. the tree format
+/// 1. The Node Link format
+/// 2. The Tree format
 ///
-/// The node link format comes from an old version of [NetworkX](https://networkx.org)
-///  and looks like the following:
-/// ```{'nodes': [{'id': 'A'}, {'id': 'B'}], 'links': [{'source': 0, 'target': 1}]}```
-/// This format is only used as legacy and is not recommended for new projects
-/// as it's easy to mess up and not even supported anymore by NetworkX.
+/// The Node Link Format:
 ///
-/// The tree format is a more natural looking format (only `id` is required):
+/// The taxonomy is represented as a directed acyclic graph (DAG) in JSON using a node-link
+/// structure:
+/// ```json
+/// {
+///   "nodes": [
+///     { "id": 0, "name": "root", "rank": "no rank" },
+///     { "id": 1, "name": "superkingdom A", "rank": "superkingdom" },
+///     { "id": 2, "name": "kingdom A", "rank": "kingdom" },
+///     { "id": 3, "name": "phylum A", "rank": "phylum" },
+///     { "id": 4, "name": "genus A", "rank": "genus" },
+///     { "id": 5, "name": "species A1", "rank": "species" }
+///   ],
+///   "links": [
+///     { "source": 5, "target": 4 },
+///     { "source": 4, "target": 3 },
+///     { "source": 3, "target": 2 },
+///     { "source": 2, "target": 1 },
+///     { "source": 1, "target": 0 }
+///   ]
+/// }
+/// ```
+///
+/// nodes:
+/// A list of taxonomic units. Each node has:
+///   id – unique integer identifier
+///   name – the scientific name or placeholder label
+///   rank – the taxonomic rank (e.g., "species", "genus", "family")
+///
+/// links:
+/// A list of directed edges between nodes. Each link has:
+///   source – the child node’s index in the nodes array
+///   target – the parent node’s index in the nodes array
+///
+/// The Tree Format
+///
+/// In the tree format, child nodes are nested within their parent node. This format is more
+/// natural as the taxonomic structure is immediately apparent from reading it.
+///
 /// ```json
 /// {
 ///     "id": "1",
@@ -42,7 +75,7 @@ use serde_json::{json, to_value, to_writer, Value};
 ///             ]
 ///         }
 ///     ]
-// }
+/// }
 /// ```
 //
 /// For both formats, you can add more data on each node object and these will be available after loading.
