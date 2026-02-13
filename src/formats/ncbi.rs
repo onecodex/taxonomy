@@ -95,18 +95,24 @@ where
     let mut node_writer = BufWriter::new(std::fs::File::create(dir.join(NODES_FILENAME))?);
     let mut name_writer = BufWriter::new(std::fs::File::create(dir.join(NAMES_FILENAME))?);
 
-    for key in tax.traverse(tax.root())?.filter(|x| x.1).map(|x| x.0) {
+    let root = tax.root();
+    for key in tax.traverse(root.clone())?.filter(|x| x.1).map(|x| x.0) {
         let name = tax.name(key.clone())?;
         let rank = tax.rank(key.clone())?;
+        let parent = if key == root {
+            format!("{}", key)
+        } else {
+            tax.parent(key.clone())?
+                .map(|(x, _)| format!("{}", x))
+                .unwrap_or_default()
+        };
         name_writer
-            .write_all(format!("{}\t|\t{}\t|\tscientific name\t|", &key, name).as_bytes())?;
+            .write_all(format!("{}\t|\t{}\t|\t\t|\tscientific name\t|\n", &key, name).as_bytes())?;
         node_writer.write_all(
             format!(
-                "{}\t|\t{}\t|\t{}\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|",
+                "{}\t|\t{}\t|\t{}\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\n",
                 &key,
-                tax.parent(key.clone())?
-                    .map(|(x, _)| format!("{}", x))
-                    .unwrap_or_default(),
+                parent,
                 rank.to_ncbi_rank(),
             )
             .as_bytes(),
@@ -215,5 +221,42 @@ mod tests {
 
         let out = path.join("out");
         save::<&str, _, _>(&tax, &out).unwrap();
+
+        // now load again and validate a few taxids
+        let tax2 = load(&out).unwrap();
+
+        // Check E. coli (562)
+        assert_eq!(
+            Taxonomy::<&str>::name(&tax2, "562").unwrap(),
+            "Escherichia coli"
+        );
+        assert_eq!(
+            Taxonomy::<&str>::rank(&tax2, "562").unwrap(),
+            TaxRank::Species
+        );
+        assert_eq!(
+            Taxonomy::<&str>::parent(&tax2, "562").unwrap(),
+            Some(("561", 1.))
+        );
+
+        // Check Escherichia (561)
+        assert_eq!(Taxonomy::<&str>::name(&tax2, "561").unwrap(), "Escherichia");
+        assert_eq!(
+            Taxonomy::<&str>::rank(&tax2, "561").unwrap(),
+            TaxRank::Genus
+        );
+        assert_eq!(
+            Taxonomy::<&str>::parent(&tax2, "561").unwrap(),
+            Some(("543", 1.))
+        );
+
+        // Check root (1)
+        assert_eq!(Taxonomy::<&str>::name(&tax2, "1").unwrap(), "root");
+
+        // Check children relationship preserved
+        assert_eq!(
+            Taxonomy::<&str>::children(&tax2, "561").unwrap(),
+            vec!["562"]
+        );
     }
 }
