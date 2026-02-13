@@ -263,6 +263,19 @@ impl Taxonomy {
         Ok(PyBytes::new(py, &bytes).into())
     }
 
+    /// to_ncbi(self, output_dir: str)
+    /// --
+    ///
+    /// Export a Taxonomy to NCBI format files (nodes.dmp and names.dmp).
+    /// The output directory will be created if it doesn't exist.
+    ///
+    /// Args:
+    ///     output_dir: Path to the directory where nodes.dmp and names.dmp will be written
+    fn to_ncbi(&self, output_dir: &str) -> PyResult<()> {
+        py_try!(ncbi::save::<&str, _, _>(&self.tax, output_dir));
+        Ok(())
+    }
+    
     /// to_newick(self)
     /// --
     ///
