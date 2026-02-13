@@ -95,11 +95,12 @@ where
     let mut node_writer = BufWriter::new(std::fs::File::create(dir.join(NODES_FILENAME))?);
     let mut name_writer = BufWriter::new(std::fs::File::create(dir.join(NAMES_FILENAME))?);
 
-    for key in tax.traverse(tax.root())?.filter(|x| x.1).map(|x| x.0) {
+    let root = tax.root();
+    for key in tax.traverse(root.clone())?.filter(|x| x.1).map(|x| x.0) {
         let name = tax.name(key.clone())?;
         let rank = tax.rank(key.clone())?;
-        let parent = if key.to_string() == "1" {
-            "1".to_string()
+        let parent = if key == root {
+            format!("{}", key)
         } else {
             tax.parent(key.clone())?
                 .map(|(x, _)| format!("{}", x))
