@@ -275,7 +275,7 @@ impl Taxonomy {
         py_try!(ncbi::save::<&str, _, _>(&self.tax, output_dir));
         Ok(())
     }
-    
+
     /// to_newick(self)
     /// --
     ///

@@ -75,6 +75,13 @@ class Taxonomy:
         """Export a Taxonomy as a Newick-encoded byte string."""
         ...
 
+    def to_ncbi(self, output_dir: str) -> None:
+        """
+        Export a Taxonomy to NCBI format files (nodes.dmp and names.dmp).
+        The output directory will be created if it doesn't exist.
+        """
+        ...
+
     def node(self, tax_id: str) -> Optional[TaxonomyNode]:
         """Find a node by its id. Returns `None` if not found"""
         ...
