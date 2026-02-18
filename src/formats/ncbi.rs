@@ -14,7 +14,10 @@ const NAMES_FILENAME: &str = "names.dmp";
 
 /// Loads a NCBI taxonomy from the given directory.
 /// The directory should contain at least two files: `nodes.dmp` and `names.dmp`.
-pub fn load<P: AsRef<Path>>(ncbi_directory: P, genetic_code: Option<bool>) -> TaxonomyResult<GeneralTaxonomy> {
+pub fn load<P: AsRef<Path>>(
+    ncbi_directory: P,
+    genetic_code: Option<bool>,
+) -> TaxonomyResult<GeneralTaxonomy> {
     let dir = ncbi_directory.as_ref();
     let nodes_file = std::fs::File::open(dir.join(NODES_FILENAME))?;
     let names_file = std::fs::File::open(dir.join(NAMES_FILENAME))?;
@@ -52,7 +55,10 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P, genetic_code: Option<bool>) -> Ta
 
         let mut node_data = HashMap::new();
         if genetic_code.unwrap_or(false) && !genetic_code_id.is_empty() {
-            node_data.insert("genetic_code_id".to_string(), serde_json::Value::String(genetic_code_id));
+            node_data.insert(
+                "genetic_code_id".to_string(),
+                serde_json::Value::String(genetic_code_id),
+            );
         }
         data.push(node_data);
 
@@ -92,8 +98,14 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P, genetic_code: Option<bool>) -> Ta
         }
     }
 
-    let gt =
-        GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None, Some(data))?;
+    let gt = GeneralTaxonomy::from_arrays(
+        tax_ids,
+        parent_ids,
+        Some(names),
+        Some(ranks),
+        None,
+        Some(data),
+    )?;
     gt.validate_uniqueness()?;
     Ok(gt)
 }
