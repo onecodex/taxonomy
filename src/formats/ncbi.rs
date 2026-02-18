@@ -14,7 +14,7 @@ const NAMES_FILENAME: &str = "names.dmp";
 
 /// Loads a NCBI taxonomy from the given directory.
 /// The directory should contain at least two files: `nodes.dmp` and `names.dmp`.
-pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy> {
+pub fn load<P: AsRef<Path>>(ncbi_directory: P, genetic_code: Option<bool>) -> TaxonomyResult<GeneralTaxonomy> {
     let dir = ncbi_directory.as_ref();
     let nodes_file = std::fs::File::open(dir.join(NODES_FILENAME))?;
     let names_file = std::fs::File::open(dir.join(NAMES_FILENAME))?;
@@ -23,6 +23,7 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
     let mut tax_ids: Vec<String> = Vec::new();
     let mut parents: Vec<String> = Vec::new();
     let mut ranks: Vec<TaxRank> = Vec::new();
+    let mut data: Vec<HashMap<String, serde_json::Value>> = Vec::new();
     let mut tax_to_idx: HashMap<String, usize> = HashMap::new();
 
     for (ix, line) in BufReader::new(nodes_file).lines().enumerate() {
@@ -37,10 +38,24 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
         let tax_id = fields.remove(0).trim().to_string();
         let parent_tax_id = fields.remove(0).trim().to_string();
         let rank = fields.remove(0);
+        // After removing tax_id, parent_tax_id, and rank, fields[3] contains the genetic code ID
+        // (originally the 7th column, index 6)
+        let genetic_code_id = if fields.len() > 3 {
+            fields[3].trim().to_string()
+        } else {
+            String::new()
+        };
 
         tax_ids.push(tax_id.clone());
         parents.push(parent_tax_id.to_string());
         ranks.push(TaxRank::from_str(&rank)?);
+
+        let mut node_data = HashMap::new();
+        if genetic_code.unwrap_or(false) && !genetic_code_id.is_empty() {
+            node_data.insert("genetic_code_id".to_string(), serde_json::Value::String(genetic_code_id));
+        }
+        data.push(node_data);
+
         tax_to_idx.insert(tax_id, ix);
     }
 
@@ -78,7 +93,7 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
     }
 
     let gt =
-        GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None, None)?;
+        GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None, Some(data))?;
     gt.validate_uniqueness()?;
     Ok(gt)
 }
@@ -106,14 +121,23 @@ where
                 .map(|(x, _)| format!("{}", x))
                 .unwrap_or_default()
         };
+
+        // Extract genetic_code_id from data if present
+        let genetic_code_data = tax.data(key.clone())?;
+        let genetic_code = genetic_code_data
+            .get("genetic_code_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("1");
+
         name_writer
             .write_all(format!("{}\t|\t{}\t|\t\t|\tscientific name\t|\n", &key, name).as_bytes())?;
         node_writer.write_all(
             format!(
-                "{}\t|\t{}\t|\t{}\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\n",
+                "{}\t|\t{}\t|\t{}\t|\t\t|\t\t|\t\t|\t{}\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\n",
                 &key,
                 parent,
                 rank.to_ncbi_rank(),
+                genetic_code,
             )
             .as_bytes(),
         )?;
@@ -201,7 +225,7 @@ mod tests {
         let mut names_file = std::fs::File::create(path.join(NAMES_FILENAME)).unwrap();
         writeln!(names_file, "{}", names).unwrap();
 
-        let tax = load(path).unwrap();
+        let tax = load(path, Some(true)).unwrap();
         assert_eq!(
             Taxonomy::<&str>::name(&tax, "562").unwrap(),
             "Escherichia coli"
@@ -223,7 +247,7 @@ mod tests {
         save::<&str, _, _>(&tax, &out).unwrap();
 
         // now load again and validate a few taxids
-        let tax2 = load(&out).unwrap();
+        let tax2 = load(&out, Some(true)).unwrap();
 
         // Check E. coli (562)
         assert_eq!(

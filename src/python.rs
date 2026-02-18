@@ -74,6 +74,8 @@ pub struct TaxonomyNode {
     parent: Option<String>,
     #[pyo3(get)]
     rank: String,
+    #[pyo3(get)]
+    genetic_code: Option<String>,
     // Ideally this would be private
     extra: HashMap<String, Value>,
 }
@@ -86,6 +88,7 @@ impl TaxonomyNode {
         self.name.hash(&mut hasher);
         self.parent.hash(&mut hasher);
         self.rank.hash(&mut hasher);
+        self.genetic_code.hash(&mut hasher);
         for key in self.extra.keys() {
             key.hash(&mut hasher);
         }
@@ -108,6 +111,7 @@ impl TaxonomyNode {
             "name" => Ok(self.name.to_object(py)),
             "parent" => Ok(self.parent.to_object(py)),
             "rank" => Ok(self.rank.to_object(py)),
+            "genetic_code" => Ok(self.genetic_code.to_object(py)),
             _ => {
                 if self.extra.contains_key(key) {
                     Ok(json_value_to_pyobject(self.extra.get(key).unwrap()))
@@ -153,10 +157,17 @@ impl Taxonomy {
         let parent = py_try!(self.tax.parent(tax_id)).map(|(p, _)| p.to_string());
         let extra = py_try!(self.tax.data(tax_id));
 
+        // Extract genetic_code_id from extra data if present
+        let genetic_code = extra
+            .get("genetic_code_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
         Ok(TaxonomyNode {
             id: tax_id.to_string(),
             name: name.to_string(),
             rank,
+            genetic_code,
             extra: (*extra).to_owned(),
             parent,
         })
@@ -201,14 +212,14 @@ impl Taxonomy {
         Ok(Taxonomy { tax })
     }
 
-    /// from_ncbi(cls, dump_dir: str)
+    /// from_ncbi(cls, dump_dir: str, genetic_code: bool = None)
     /// --
     ///
     /// Load a Taxonomy from a directory.
     /// The directory must contain the `nodes.dmp` and `names.dmp` files.
     #[classmethod]
-    fn from_ncbi(_cls: &PyType, dump_dir: &str) -> PyResult<Taxonomy> {
-        let tax = py_try!(ncbi::load(dump_dir));
+    fn from_ncbi(_cls: &PyType, dump_dir: &str, genetic_code: Option<bool>) -> PyResult<Taxonomy> {
+        let tax = py_try!(ncbi::load(dump_dir, genetic_code));
         Ok(Taxonomy { tax })
     }
 

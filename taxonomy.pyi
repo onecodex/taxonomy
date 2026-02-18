@@ -12,6 +12,7 @@ class TaxonomyNode:
     name: str
     parent: Optional[str]
     rank: str
+    genetic_code: Optional[str]
 
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
