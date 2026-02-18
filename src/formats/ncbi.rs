@@ -243,6 +243,13 @@ mod tests {
             Some(("561", 1.))
         );
 
+        // Check that genetic code is included when genetic_code=Some(true)
+        let data_562 = Taxonomy::<&str>::data(&tax, "562").unwrap();
+        assert_eq!(
+            data_562.get("genetic_code_id").and_then(|v| v.as_str()),
+            Some("11")
+        );
+
         let out = path.join("out");
         save::<&str, _, _>(&tax, &out).unwrap();
 
@@ -282,5 +289,20 @@ mod tests {
             Taxonomy::<&str>::children(&tax2, "561").unwrap(),
             vec!["562"]
         );
+
+        // Test loading without genetic_code (None)
+        let tax_no_gc = load(path, None).unwrap();
+        assert_eq!(
+            Taxonomy::<&str>::name(&tax_no_gc, "562").unwrap(),
+            "Escherichia coli"
+        );
+        // Check that genetic code is NOT included when genetic_code=None
+        let data_no_gc = Taxonomy::<&str>::data(&tax_no_gc, "562").unwrap();
+        assert_eq!(data_no_gc.get("genetic_code_id"), None);
+
+        // Test loading with genetic_code=Some(false)
+        let tax_false_gc = load(path, Some(false)).unwrap();
+        let data_false_gc = Taxonomy::<&str>::data(&tax_false_gc, "562").unwrap();
+        assert_eq!(data_false_gc.get("genetic_code_id"), None);
     }
 }

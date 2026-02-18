@@ -212,7 +212,7 @@ impl Taxonomy {
         Ok(Taxonomy { tax })
     }
 
-    /// from_ncbi(cls, dump_dir: str, genetic_code: bool = None)
+    /// from_ncbi(cls, dump_dir: str, genetic_code: bool|None = None)
     /// --
     ///
     /// Load a Taxonomy from a directory.
