@@ -318,6 +318,9 @@ impl Taxonomy {
     /// --
     ///
     /// Export a Taxonomy as a JSON-encoded byte string in a tree format
+    /// Suggest using to_json_tree_streaming instead for large trees
+    /// with additional data available in the tree, this function may now OOM for users
+    /// perhaps limit this function to outputting the few fields previously available
     fn to_json_tree(&self, py: Python<'_>) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
         py_try!(json::save::<_, &str, _>(
