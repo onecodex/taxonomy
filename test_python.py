@@ -425,6 +425,11 @@ def test_ncbi_prune(ncbi_tax: Taxonomy):
     assert new_tax.node("561") is not None
 
 
+def test_taxonomy_is_iterable(ncbi_tax: Taxonomy):
+    for _ in ncbi_tax:
+        break
+
+
 @pytest.mark.skip(reason="tax.remove doesn't work on truncated taxonomies?")
 def test_ncbi_remove():
     tax = Taxonomy.from_ncbi("tests/data/")
