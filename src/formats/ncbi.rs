@@ -23,12 +23,12 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
     let mut tax_ids: Vec<String> = Vec::new();
     let mut parents: Vec<String> = Vec::new();
     let mut ranks: Vec<TaxRank> = Vec::new();
+    let mut data: Vec<HashMap<String, serde_json::Value>> = Vec::new();
     let mut tax_to_idx: HashMap<String, usize> = HashMap::new();
 
     for (ix, line) in BufReader::new(nodes_file).lines().enumerate() {
         let mut fields: Vec<String> = line?.split("\t|\t").map(|x| x.to_string()).collect();
-        if fields.len() < 10 {
-            // should be at least 14
+        if fields.len() < 12 {
             return Err(Error::new(ErrorKind::ImportError {
                 line: ix,
                 msg: "Not enough fields in nodes.dmp; bad line?".to_owned(),
@@ -36,11 +36,60 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
         }
         let tax_id = fields.remove(0).trim().to_string();
         let parent_tax_id = fields.remove(0).trim().to_string();
-        let rank = fields.remove(0);
+        let rank = fields.remove(0).trim().to_string();
+        let embl_code = fields.remove(0).trim().to_string();
+        let division_id = fields.remove(0).trim().to_string();
+        let inherited_div_flag = fields.remove(0).trim().to_string();
+        let genetic_code_id = fields.remove(0).trim().to_string();
+        let inherited_GC_flag = fields.remove(0).trim().to_string();
+        let mitochondrial_genetic_code_id = fields.remove(0).trim().to_string();
+        let inherited_MGC_flag = fields.remove(0).trim().to_string();
+        let GenBank_hidden_flag = fields.remove(0).trim().to_string();
+        let hidden_subtree_root_flag = fields.remove(0).trim().to_string();
+        let comments = if !fields.is_empty() {
+            fields.remove(0).trim().trim_end_matches("\t|").to_string()
+        } else {
+            String::new()
+        };
 
         tax_ids.push(tax_id.clone());
         parents.push(parent_tax_id.to_string());
         ranks.push(TaxRank::from_str(&rank)?);
+
+        // Store all node fields in data HashMap
+        let mut node_data = HashMap::new();
+        if !embl_code.is_empty() {
+            node_data.insert("embl_code".to_string(), serde_json::Value::String(embl_code));
+        }
+        if !division_id.is_empty() {
+            node_data.insert("division_id".to_string(), serde_json::Value::String(division_id));
+        }
+        if !inherited_div_flag.is_empty() {
+            node_data.insert("inherited_div_flag".to_string(), serde_json::Value::String(inherited_div_flag));
+        }
+        if !genetic_code_id.is_empty() {
+            node_data.insert("genetic_code_id".to_string(), serde_json::Value::String(genetic_code_id));
+        }
+        if !inherited_GC_flag.is_empty() {
+            node_data.insert("inherited_GC_flag".to_string(), serde_json::Value::String(inherited_GC_flag));
+        }
+        if !mitochondrial_genetic_code_id.is_empty() {
+            node_data.insert("mitochondrial_genetic_code_id".to_string(), serde_json::Value::String(mitochondrial_genetic_code_id));
+        }
+        if !inherited_MGC_flag.is_empty() {
+            node_data.insert("inherited_MGC_flag".to_string(), serde_json::Value::String(inherited_MGC_flag));
+        }
+        if !GenBank_hidden_flag.is_empty() {
+            node_data.insert("GenBank_hidden_flag".to_string(), serde_json::Value::String(GenBank_hidden_flag));
+        }
+        if !hidden_subtree_root_flag.is_empty() {
+            node_data.insert("hidden_subtree_root_flag".to_string(), serde_json::Value::String(hidden_subtree_root_flag));
+        }
+        if !comments.is_empty() {
+            node_data.insert("comments".to_string(), serde_json::Value::String(comments));
+        }
+
+        data.push(node_data);
         tax_to_idx.insert(tax_id, ix);
     }
 
@@ -57,28 +106,45 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
         }
     }
 
-    // And then grab their names by their idx
+    // Grab scientific names and store all other name types in data
     let mut names: Vec<String> = vec![String::new(); tax_ids.len()];
     for (ix, line) in BufReader::new(names_file).lines().enumerate() {
         let mut fields: Vec<String> = line?.split("\t|\t").map(|x| x.to_string()).collect();
-        if fields.len() > 10 {
-            // should only be 5
+        if fields.len() < 4 {
             return Err(Error::new(ErrorKind::ImportError {
                 line: ix,
-                msg: "Too many fields in names.dmp".to_owned(),
+                msg: "Not enough fields in names.dmp".to_owned(),
             }));
         }
         let tax_id = fields.remove(0).trim().to_string();
-        let name = fields.remove(0).trim().to_string();
-        let name_class = fields.remove(1);
-        if name_class.starts_with("scientific name") {
-            let name = name.to_string();
-            names[tax_to_idx[&*tax_id]] = name;
+        let name_txt = fields.remove(0).trim().to_string();
+        let unique_name = fields.remove(0).trim().to_string();
+        let name_class = fields.remove(0).trim().trim_end_matches("\t|").to_string();
+
+        if let Some(&idx) = tax_to_idx.get(&tax_id) {
+            if name_class == "scientific name" {
+                names[idx] = name_txt.clone();
+            }
+
+            // Store all name types in data
+            let name_key = format!("name_{}", name_class.replace(" ", "_"));
+            data[idx].insert(name_key, serde_json::Value::String(name_txt));
+
+            if !unique_name.is_empty() {
+                let unique_key = format!("unique_name_{}", name_class.replace(" ", "_"));
+                data[idx].insert(unique_key, serde_json::Value::String(unique_name));
+            }
         }
     }
 
-    let gt =
-        GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), Some(ranks), None, None)?;
+    let gt = GeneralTaxonomy::from_arrays(
+        tax_ids,
+        parent_ids,
+        Some(names),
+        Some(ranks),
+        None,
+        Some(data),
+    )?;
     gt.validate_uniqueness()?;
     Ok(gt)
 }
@@ -106,14 +172,88 @@ where
                 .map(|(x, _)| format!("{}", x))
                 .unwrap_or_default()
         };
+
+        // Extract data fields
+        let node_data = tax.data(key.clone())?;
+        let embl_code = node_data
+            .get("embl_code")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let division_id = node_data
+            .get("division_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0");
+        let inherited_div_flag = node_data
+            .get("inherited_div_flag")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0");
+        let genetic_code_id = node_data
+            .get("genetic_code_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("1");
+        let inherited_GC_flag = node_data
+            .get("inherited_GC_flag")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0");
+        let mitochondrial_genetic_code_id = node_data
+            .get("mitochondrial_genetic_code_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0");
+        let inherited_MGC_flag = node_data
+            .get("inherited_MGC_flag")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0");
+        let GenBank_hidden_flag = node_data
+            .get("GenBank_hidden_flag")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0");
+        let hidden_subtree_root_flag = node_data
+            .get("hidden_subtree_root_flag")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0");
+        let comments = node_data
+            .get("comments")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        // Write scientific name
         name_writer
             .write_all(format!("{}\t|\t{}\t|\t\t|\tscientific name\t|\n", &key, name).as_bytes())?;
+
+        // Write all alternative names from data
+        for (data_key, value) in node_data.iter() {
+            if data_key.starts_with("name_") && data_key != "name_scientific_name" {
+                let name_class = data_key.strip_prefix("name_").unwrap().replace("_", " ");
+                let name_txt = value.as_str().unwrap_or("");
+                let unique_name_key = format!("unique_name_{}", data_key.strip_prefix("name_").unwrap());
+                let unique_name = node_data
+                    .get(&unique_name_key)
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                name_writer.write_all(
+                    format!("{}\t|\t{}\t|\t{}\t|\t{}\t|\n", &key, name_txt, unique_name, name_class)
+                        .as_bytes(),
+                )?;
+            }
+        }
+
+        // Write nodes.dmp entry with all fields
         node_writer.write_all(
             format!(
-                "{}\t|\t{}\t|\t{}\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\t\t|\n",
+                "{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\n",
                 &key,
                 parent,
                 rank.to_ncbi_rank(),
+                embl_code,
+                division_id,
+                inherited_div_flag,
+                genetic_code_id,
+                inherited_GC_flag,
+                mitochondrial_genetic_code_id,
+                inherited_MGC_flag,
+                GenBank_hidden_flag,
+                hidden_subtree_root_flag,
+                comments,
             )
             .as_bytes(),
         )?;
@@ -219,6 +359,20 @@ mod tests {
             Some(("561", 1.))
         );
 
+        // Check that node data fields are loaded
+        let data_562 = Taxonomy::<&str>::data(&tax, "562").unwrap();
+        assert_eq!(
+            data_562.get("genetic_code_id").and_then(|v| v.as_str()),
+            Some("11")
+        );
+
+        // Check that alternative names are stored
+        assert!(data_562.contains_key("name_common_name"));
+        assert_eq!(
+            data_562.get("name_common_name").and_then(|v| v.as_str()),
+            Some("E. coli")
+        );
+
         let out = path.join("out");
         save::<&str, _, _>(&tax, &out).unwrap();
 
@@ -257,6 +411,20 @@ mod tests {
         assert_eq!(
             Taxonomy::<&str>::children(&tax2, "561").unwrap(),
             vec!["562"]
+        );
+
+        // Check that data fields are preserved through save/load cycle
+        let data_562_after = Taxonomy::<&str>::data(&tax2, "562").unwrap();
+        assert_eq!(
+            data_562_after.get("genetic_code_id").and_then(|v| v.as_str()),
+            Some("11")
+        );
+
+        // Check that alternative names are preserved
+        assert!(data_562_after.contains_key("name_common_name"));
+        assert_eq!(
+            data_562_after.get("name_common_name").and_then(|v| v.as_str()),
+            Some("E. coli")
         );
     }
 }

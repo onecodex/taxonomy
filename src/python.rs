@@ -124,6 +124,78 @@ impl TaxonomyNode {
             self.id, self.rank, self.name
         ))
     }
+
+    /// get_data(self)
+    /// --
+    ///
+    /// Get all extra data fields as a dictionary.
+    ///
+    /// Returns:
+    ///     dict: Dictionary containing all additional fields from the taxonomy
+    fn get_data(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let pydict = PyDict::new(py);
+        for (key, val) in self.extra.iter() {
+            pydict.set_item(key, json_value_to_pyobject(val))?;
+        }
+        Ok(pydict.to_object(py))
+    }
+
+    /// get_data_keys(self)
+    /// --
+    ///
+    /// Get list of all available data field keys.
+    ///
+    /// Returns:
+    ///     list: List of field names available in the extra data
+    fn get_data_keys(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let pylist = PyList::empty(py);
+        for key in self.extra.keys() {
+            pylist.append(key)?;
+        }
+        Ok(pylist.to_object(py))
+    }
+
+    /// get(self, key: str, default=None)
+    /// --
+    ///
+    /// Get a data field value with optional default.
+    ///
+    /// Args:
+    ///     key: Field name to retrieve
+    ///     default: Default value if field doesn't exist (default: None)
+    ///
+    /// Returns:
+    ///     Value of the field or default if not found
+    fn get(&self, key: &str, default: Option<&PyAny>, py: Python<'_>) -> PyResult<PyObject> {
+        if self.extra.contains_key(key) {
+            Ok(json_value_to_pyobject(self.extra.get(key).unwrap()))
+        } else if let Some(def) = default {
+            Ok(def.to_object(py))
+        } else {
+            Ok(py.None())
+        }
+    }
+
+    /// Convenience properties for common NCBI fields
+    #[getter]
+    fn genetic_code_id(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.get("genetic_code_id", None, py)
+    }
+
+    #[getter]
+    fn embl_code(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.get("embl_code", None, py)
+    }
+
+    #[getter]
+    fn division_id(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.get("division_id", None, py)
+    }
+
+    #[getter]
+    fn mitochondrial_genetic_code_id(&self, py: Python<'_>) -> PyResult<PyObject> {
+        self.get("mitochondrial_genetic_code_id", None, py)
+    }
 }
 
 /// The Taxonomy object provides the primary interface for exploring a
@@ -206,6 +278,15 @@ impl Taxonomy {
     ///
     /// Load a Taxonomy from a directory.
     /// The directory must contain the `nodes.dmp` and `names.dmp` files.
+    ///
+    /// All fields from both nodes.dmp and names.dmp are loaded and accessible
+    /// via the node's data methods or dict-like interface.
+    ///
+    /// Args:
+    ///     dump_dir: Path to directory containing NCBI taxonomy dump files
+    ///
+    /// Returns:
+    ///     Taxonomy: Loaded taxonomy with all NCBI fields accessible
     #[classmethod]
     fn from_ncbi(_cls: &PyType, dump_dir: &str) -> PyResult<Taxonomy> {
         let tax = py_try!(ncbi::load(dump_dir));
@@ -391,6 +472,48 @@ impl Taxonomy {
             .map(|tax_id| self.as_node(tax_id))
             .collect::<PyResult<Vec<TaxonomyNode>>>()?;
         Ok(res)
+    }
+
+    /// data(self, tax_id: str)
+    /// --
+    ///
+    /// Get all extra data fields for a taxonomy node as a dictionary.
+    ///
+    /// Args:
+    ///     tax_id: The taxonomy ID to look up
+    ///
+    /// Returns:
+    ///     dict: Dictionary containing all additional fields from the taxonomy
+    fn data(&self, tax_id: &str, py: Python<'_>) -> PyResult<PyObject> {
+        let data = py_try!(self.tax.data(tax_id));
+        let pydict = PyDict::new(py);
+        for (key, val) in data.iter() {
+            pydict.set_item(key, json_value_to_pyobject(val))?;
+        }
+        Ok(pydict.to_object(py))
+    }
+
+    /// get_field(self, tax_id: str, field: str, default=None)
+    /// --
+    ///
+    /// Get a specific data field for a taxonomy node.
+    ///
+    /// Args:
+    ///     tax_id: The taxonomy ID to look up
+    ///     field: Field name to retrieve
+    ///     default: Default value if field doesn't exist (default: None)
+    ///
+    /// Returns:
+    ///     Value of the field or default if not found
+    fn get_field(&self, tax_id: &str, field: &str, default: Option<&PyAny>, py: Python<'_>) -> PyResult<PyObject> {
+        let data = py_try!(self.tax.data(tax_id));
+        if let Some(value) = data.get(field) {
+            Ok(json_value_to_pyobject(value))
+        } else if let Some(def) = default {
+            Ok(def.to_object(py))
+        } else {
+            Ok(py.None())
+        }
     }
 
     /// internal_index(self, tax_id: str)
