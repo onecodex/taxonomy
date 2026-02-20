@@ -47,7 +47,7 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
         let GenBank_hidden_flag = fields.remove(0).trim().to_string();
         let hidden_subtree_root_flag = fields.remove(0).trim().to_string();
         let comments = if !fields.is_empty() {
-            fields.remove(0).trim().trim_end_matches("\t|").to_string()
+            fields.remove(0).trim().trim_end_matches('|').trim().to_string()
         } else {
             String::new()
         };
@@ -119,7 +119,7 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
         let tax_id = fields.remove(0).trim().to_string();
         let name_txt = fields.remove(0).trim().to_string();
         let unique_name = fields.remove(0).trim().to_string();
-        let name_class = fields.remove(0).trim().trim_end_matches("\t|").to_string();
+        let name_class = fields.remove(0).trim().trim_end_matches('|').trim().to_string();
 
         if let Some(&idx) = tax_to_idx.get(&tax_id) {
             if name_class == "scientific name" {
