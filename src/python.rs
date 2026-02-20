@@ -381,7 +381,7 @@ impl Taxonomy {
 
     /// to_newick(self)
     /// --
-    ///
+    /// Uses taxonomy ID for node names (e.g, for E. coli the node name is 562)
     /// Export a Taxonomy as a Newick-encoded byte string.
     fn to_newick(&self, py: Python<'_>) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
