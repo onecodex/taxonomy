@@ -149,6 +149,47 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
     Ok(gt)
 }
 
+/// Helper function to write a single row to nodes.dmp
+fn write_nodes_row(
+    writer: &mut BufWriter<std::fs::File>,
+    tax_id: &str,
+    parent: &str,
+    rank: &str,
+    embl_code: &str,
+    division_id: &str,
+    inherited_div: &str,
+    genetic_code: &str,
+    inherited_gc: &str,
+    mito_gc: &str,
+    inherited_mgc: &str,
+    genbank_hidden: &str,
+    subtree_hidden: &str,
+    comments: &str,
+) -> std::io::Result<()> {
+    write!(
+        writer,
+        "{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\n",
+        tax_id, parent, rank, embl_code, division_id, inherited_div,
+        genetic_code, inherited_gc, mito_gc, inherited_mgc,
+        genbank_hidden, subtree_hidden, comments
+    )
+}
+
+/// Helper function to write a single row to names.dmp
+fn write_names_row(
+    writer: &mut BufWriter<std::fs::File>,
+    tax_id: &str,
+    name: &str,
+    unique_name: &str,
+    name_class: &str,
+) -> std::io::Result<()> {
+    write!(
+        writer,
+        "{}\t|\t{}\t|\t{}\t|\t{}\t|\n",
+        tax_id, name, unique_name, name_class
+    )
+}
+
 pub fn save<'t, T: 't, P: AsRef<Path>, X: Taxonomy<'t, T>>(
     tax: &'t X,
     out_dir: P,
@@ -217,8 +258,7 @@ where
             .unwrap_or("");
 
         // Write scientific name
-        name_writer
-            .write_all(format!("{}\t|\t{}\t|\t\t|\tscientific name\t|\n", &key, name).as_bytes())?;
+        write_names_row(&mut name_writer, &format!("{}", &key), &name, "", "scientific name")?;
 
         // Write all alternative names from data
         for (data_key, value) in node_data.iter() {
@@ -230,32 +270,26 @@ where
                     .get(&unique_name_key)
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
-                name_writer.write_all(
-                    format!("{}\t|\t{}\t|\t{}\t|\t{}\t|\n", &key, name_txt, unique_name, name_class)
-                        .as_bytes(),
-                )?;
+                write_names_row(&mut name_writer, &format!("{}", &key), name_txt, unique_name, &name_class)?;
             }
         }
 
         // Write nodes.dmp entry with all fields
-        node_writer.write_all(
-            format!(
-                "{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\n",
-                &key,
-                parent,
-                rank.to_ncbi_rank(),
-                embl_code,
-                division_id,
-                inherited_div_flag,
-                genetic_code_id,
-                inherited_GC_flag,
-                mitochondrial_genetic_code_id,
-                inherited_MGC_flag,
-                GenBank_hidden_flag,
-                hidden_subtree_root_flag,
-                comments,
-            )
-            .as_bytes(),
+        write_nodes_row(
+            &mut node_writer,
+            &format!("{}", &key),
+            &parent,
+            rank.to_ncbi_rank(),
+            embl_code,
+            division_id,
+            inherited_div_flag,
+            genetic_code_id,
+            inherited_GC_flag,
+            mitochondrial_genetic_code_id,
+            inherited_MGC_flag,
+            GenBank_hidden_flag,
+            hidden_subtree_root_flag,
+            comments,
         )?;
     }
 
