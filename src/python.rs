@@ -329,6 +329,25 @@ impl Taxonomy {
         Ok(PyBytes::new(py, &bytes).into())
     }
 
+    /// to_json_tree_streaming(self)
+    /// --
+    ///
+    /// Export a Taxonomy as a JSON-encoded byte string in a tree format.
+    /// This version uses streaming/incremental writing for much better memory
+    /// efficiency with large taxonomies (e.g., full NCBI taxonomy with 2.5M+ nodes).
+    ///
+    /// Unlike to_json_tree(), which builds the entire tree structure in memory
+    /// before serialization, this writes JSON directly as it traverses the tree.
+    fn to_json_tree_streaming(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let mut bytes = Vec::new();
+        py_try!(json::save_tree_streaming::<_, &str, _>(
+            &mut bytes,
+            &self.tax,
+            None
+        ));
+        Ok(PyBytes::new(py, &bytes).into())
+    }
+
     /// to_json_node_links(self)
     /// --
     ///
