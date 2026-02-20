@@ -344,9 +344,7 @@ impl Taxonomy {
     fn to_json_tree_streaming(&self, py: Python<'_>) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
         py_try!(json::save_tree_streaming::<_, &str, _>(
-            &mut bytes,
-            &self.tax,
-            None
+            &mut bytes, &self.tax, None
         ));
         Ok(PyBytes::new(py, &bytes).into())
     }
@@ -527,7 +525,13 @@ impl Taxonomy {
     ///
     /// Returns:
     ///     Value of the field or default if not found
-    fn get_field(&self, tax_id: &str, field: &str, default: Option<&PyAny>, py: Python<'_>) -> PyResult<PyObject> {
+    fn get_field(
+        &self,
+        tax_id: &str,
+        field: &str,
+        default: Option<&PyAny>,
+        py: Python<'_>,
+    ) -> PyResult<PyObject> {
         let data = py_try!(self.tax.data(tax_id));
         if let Some(value) = data.get(field) {
             Ok(json_value_to_pyobject(value))

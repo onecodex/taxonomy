@@ -844,13 +844,22 @@ mod tests {
         // Verify we can reload from streaming output
         let tax2 = load(Cursor::new(&streaming_output[..]), None).unwrap();
         assert_eq!(Taxonomy::<&str>::len(&tax2), 3);
-        assert_eq!(Taxonomy::<&str>::name(&tax2, "562").unwrap(), "Escherichia coli");
+        assert_eq!(
+            Taxonomy::<&str>::name(&tax2, "562").unwrap(),
+            "Escherichia coli"
+        );
 
         // Verify extra data is preserved
         let data = Taxonomy::<&str>::data(&tax2, "562").unwrap();
-        assert_eq!(data.get("genetic_code_id").and_then(|v| v.as_str()), Some("11"));
+        assert_eq!(
+            data.get("genetic_code_id").and_then(|v| v.as_str()),
+            Some("11")
+        );
         assert_eq!(data.get("embl_code").and_then(|v| v.as_str()), Some("EC"));
-        assert_eq!(data.get("name_common_name").and_then(|v| v.as_str()), Some("E. coli"));
+        assert_eq!(
+            data.get("name_common_name").and_then(|v| v.as_str()),
+            Some("E. coli")
+        );
     }
 
     #[test]
@@ -883,9 +892,18 @@ mod tests {
         let tax2 = load(Cursor::new(&streaming_output[..]), None).unwrap();
         let data = Taxonomy::<&str>::data(&tax2, "562").unwrap();
 
-        assert_eq!(data.get("genetic_code_id").and_then(|v| v.as_str()), Some("11"));
-        assert_eq!(data.get("name_common_name").and_then(|v| v.as_str()), Some("E. coli"));
-        assert_eq!(data.get("name_synonym").and_then(|v| v.as_str()), Some("Bacterium coli"));
+        assert_eq!(
+            data.get("genetic_code_id").and_then(|v| v.as_str()),
+            Some("11")
+        );
+        assert_eq!(
+            data.get("name_common_name").and_then(|v| v.as_str()),
+            Some("E. coli")
+        );
+        assert_eq!(
+            data.get("name_synonym").and_then(|v| v.as_str()),
+            Some("Bacterium coli")
+        );
         assert_eq!(data.get("comments").and_then(|v| v.as_str()), Some(""));
     }
 }
