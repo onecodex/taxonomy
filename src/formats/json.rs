@@ -426,18 +426,16 @@ where
         to_writer(&mut *writer, value)?;
     }
 
-    // Write children
+    // Write children (always include, even if empty, to match regular format)
     let children = tax.children(tax_id)?;
-    if !children.is_empty() {
-        write!(writer, ",\"children\":[")?;
-        for (i, child) in children.into_iter().enumerate() {
-            if i > 0 {
-                write!(writer, ",")?;
-            }
-            write_node_streaming(tax, child, writer)?;
+    write!(writer, ",\"children\":[")?;
+    for (i, child) in children.into_iter().enumerate() {
+        if i > 0 {
+            write!(writer, ",")?;
         }
-        write!(writer, "]")?;
+        write_node_streaming(tax, child, writer)?;
     }
+    write!(writer, "]")?;
 
     write!(writer, "}}")?;
     Ok(())
