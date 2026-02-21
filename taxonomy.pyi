@@ -19,6 +19,38 @@ class TaxonomyNode:
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, other: object) -> bool: ...
 
+    def get_data(self) -> dict:
+        """Get all extra data fields as a dictionary."""
+        ...
+
+    def get_data_keys(self) -> List[str]:
+        """Get list of all available data field keys."""
+        ...
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a data field value with optional default."""
+        ...
+
+    @property
+    def genetic_code_id(self) -> Optional[str]:
+        """NCBI genetic code ID."""
+        ...
+
+    @property
+    def embl_code(self) -> Optional[str]:
+        """NCBI EMBL code."""
+        ...
+
+    @property
+    def division_id(self) -> Optional[str]:
+        """NCBI division ID."""
+        ...
+
+    @property
+    def mitochondrial_genetic_code_id(self) -> Optional[str]:
+        """NCBI mitochondrial genetic code ID."""
+        ...
+
 class Taxonomy:
     """
     The Taxonomy object provides the primary interface for exploring a
@@ -65,6 +97,19 @@ class Taxonomy:
 
     def to_json_tree(self) -> bytes:
         """Export a Taxonomy as a JSON-encoded byte string in a tree format"""
+        ...
+
+    def to_json_tree_streaming(self) -> bytes:
+        """
+        Export a Taxonomy as a JSON-encoded byte string in a tree format.
+
+        This version uses streaming/incremental writing for much better memory
+        efficiency with large taxonomies (e.g., full NCBI taxonomy with 2.5M+ nodes).
+
+        Unlike to_json_tree(), which builds the entire tree structure in memory
+        before serialization, this writes JSON directly as it traverses the tree.
+        Use this for large NCBI taxonomies to avoid high memory usage.
+        """
         ...
 
     def to_json_node_links(self) -> bytes:
@@ -120,6 +165,32 @@ class Taxonomy:
         """
         Return a list of all the parent taxonomy nodes of the node id provided
         (including that node itself).
+        """
+        ...
+
+    def data(self, tax_id: str) -> dict:
+        """
+        Get all extra data fields for a taxonomy node as a dictionary.
+
+        Args:
+            tax_id: The taxonomy ID to look up
+
+        Returns:
+            Dictionary containing all additional fields from the taxonomy
+        """
+        ...
+
+    def get_field(self, tax_id: str, field: str, default: Any = None) -> Any:
+        """
+        Get a specific data field for a taxonomy node.
+
+        Args:
+            tax_id: The taxonomy ID to look up
+            field: Field name to retrieve
+            default: Default value if field doesn't exist (default: None)
+
+        Returns:
+            Value of the field or default if not found
         """
         ...
 
