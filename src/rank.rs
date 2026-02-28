@@ -148,6 +148,7 @@ impl TaxRank {
             TaxRank::Strain => "strain",
             TaxRank::Varietas => "varietas",
             TaxRank::Forma => "forma",
+            TaxRank::Strain => "strain",
             TaxRank::Unspecified => "no rank",
             TaxRank::Clade => "clade",
             TaxRank::SeroGroup => "serogroup",
