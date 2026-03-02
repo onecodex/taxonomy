@@ -206,9 +206,19 @@ fn write_nodes_row(
     writeln!(
         writer,
         "{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|",
-        tax_id, parent, rank, embl_code, division_id, inherited_div,
-        genetic_code, inherited_gc, mito_gc, inherited_mgc,
-        genbank_hidden, subtree_hidden, comments
+        tax_id,
+        parent,
+        rank,
+        embl_code,
+        division_id,
+        inherited_div,
+        genetic_code,
+        inherited_gc,
+        mito_gc,
+        inherited_mgc,
+        genbank_hidden,
+        subtree_hidden,
+        comments
     )
 }
 
