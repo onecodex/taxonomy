@@ -86,8 +86,8 @@ pub enum JsonFormat {
     /// 1. the nodes with their taxonomic info. Internal (integer) IDs are the node's position in
     ///    the nodes array
     /// 2. the links between each node: a `source` node has a `parent` node.
-    /// The nodes are represented by indices in the nodes array
-    /// Only use that format if you have existing taxonomies in that format.
+    ///    The nodes are represented by indices in the nodes array
+    ///    Only use that format if you have existing taxonomies in that format.
     NodeLink,
     /// The preferred format
     Tree,
