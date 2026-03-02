@@ -344,14 +344,14 @@ pub fn load<R: Read>(reader: R, json_pointer: Option<&str>) -> TaxonomyResult<Ge
     Ok(gt)
 }
 
-pub fn save<'t, W: Write, T: 't, X: Taxonomy<'t, T>>(
+pub fn save<'t, W: Write, T, X: Taxonomy<'t, T>>(
     writer: W,
     taxonomy: &'t X,
     format: JsonFormat,
     root_node: Option<T>,
 ) -> TaxonomyResult<()>
 where
-    T: Clone + Debug + Display + Eq + Hash + PartialEq,
+    T: 't + Clone + Debug + Display + Eq + Hash + PartialEq,
 {
     // Defaults to root but root exists only if taxonomy is not empty.
     let root_node = root_node.or(if taxonomy.is_empty() {
@@ -371,13 +371,13 @@ where
 
 /// Memory-efficient streaming tree export that writes JSON incrementally
 /// instead of building the entire tree structure in memory first.
-pub fn save_tree_streaming<'t, W: Write, T: 't, X: Taxonomy<'t, T>>(
+pub fn save_tree_streaming<'t, W: Write, T, X: Taxonomy<'t, T>>(
     mut writer: W,
     taxonomy: &'t X,
     root_node: Option<T>,
 ) -> TaxonomyResult<()>
 where
-    T: Clone + Debug + Display + Eq + Hash + PartialEq,
+    T: 't + Clone + Debug + Display + Eq + Hash + PartialEq,
 {
     let tax_id = root_node
         .or_else(|| {
@@ -396,13 +396,13 @@ where
     Ok(())
 }
 
-fn write_node_streaming<'t, W: Write, T: 't>(
+fn write_node_streaming<'t, W: Write, T>(
     tax: &'t impl Taxonomy<'t, T>,
     tax_id: T,
     writer: &mut W,
 ) -> TaxonomyResult<()>
 where
-    T: Clone + Debug + Display + Eq + Hash + PartialEq,
+    T: 't + Clone + Debug + Display + Eq + Hash + PartialEq,
 {
     write!(writer, "{{")?;
 
@@ -452,9 +452,9 @@ where
         "Taxonomy must have a root node.".to_string(),
     )))?;
 
-    fn inner<'t, T: 't>(tax: &'t impl Taxonomy<'t, T>, tax_id: T) -> TaxonomyResult<TaxNodeTree>
+    fn inner<'t, T>(tax: &'t impl Taxonomy<'t, T>, tax_id: T) -> TaxonomyResult<TaxNodeTree>
     where
-        T: Clone + Debug + Display + Eq + Hash + PartialEq,
+        T: 't + Clone + Debug + Display + Eq + Hash + PartialEq,
     {
         let mut children = Vec::new();
         for child in tax.children(tax_id.clone())? {
@@ -473,12 +473,12 @@ where
     Ok(to_value(inner(taxonomy, tax_id)?)?)
 }
 
-fn serialize_as_node_links<'t, T: 't>(
+fn serialize_as_node_links<'t, T>(
     tax: &'t impl Taxonomy<'t, T>,
     root_node: Option<T>,
 ) -> TaxonomyResult<Value>
 where
-    T: Clone + Debug + Display + Eq + Hash + PartialEq,
+    T: 't + Clone + Debug + Display + Eq + Hash + PartialEq,
 {
     let mut nodes = Vec::new();
     let mut links = Vec::new();
