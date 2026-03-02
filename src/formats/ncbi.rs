@@ -203,9 +203,9 @@ fn write_nodes_row(
     subtree_hidden: &str,
     comments: &str,
 ) -> std::io::Result<()> {
-    write!(
+    writeln!(
         writer,
-        "{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\n",
+        "{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|",
         tax_id, parent, rank, embl_code, division_id, inherited_div,
         genetic_code, inherited_gc, mito_gc, inherited_mgc,
         genbank_hidden, subtree_hidden, comments
@@ -220,9 +220,9 @@ fn write_names_row(
     unique_name: &str,
     name_class: &str,
 ) -> std::io::Result<()> {
-    write!(
+    writeln!(
         writer,
-        "{}\t|\t{}\t|\t{}\t|\t{}\t|\n",
+        "{}\t|\t{}\t|\t{}\t|\t{}\t|",
         tax_id, name, unique_name, name_class
     )
 }
