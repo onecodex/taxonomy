@@ -12,6 +12,23 @@ use crate::taxonomy::Taxonomy;
 const NODES_FILENAME: &str = "nodes.dmp";
 const NAMES_FILENAME: &str = "names.dmp";
 
+/// Data for a single row in nodes.dmp
+struct NodesRow<'a> {
+    tax_id: &'a str,
+    parent: &'a str,
+    rank: &'a str,
+    embl_code: &'a str,
+    division_id: &'a str,
+    inherited_div: &'a str,
+    genetic_code: &'a str,
+    inherited_gc: &'a str,
+    mito_gc: &'a str,
+    inherited_mgc: &'a str,
+    genbank_hidden: &'a str,
+    subtree_hidden: &'a str,
+    comments: &'a str,
+}
+
 /// Loads a NCBI taxonomy from the given directory.
 /// The directory should contain at least two files: `nodes.dmp` and `names.dmp`.
 pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy> {
@@ -189,36 +206,24 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
 /// Helper function to write a single row to nodes.dmp
 fn write_nodes_row(
     writer: &mut BufWriter<std::fs::File>,
-    tax_id: &str,
-    parent: &str,
-    rank: &str,
-    embl_code: &str,
-    division_id: &str,
-    inherited_div: &str,
-    genetic_code: &str,
-    inherited_gc: &str,
-    mito_gc: &str,
-    inherited_mgc: &str,
-    genbank_hidden: &str,
-    subtree_hidden: &str,
-    comments: &str,
+    row: &NodesRow,
 ) -> std::io::Result<()> {
     writeln!(
         writer,
         "{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|",
-        tax_id,
-        parent,
-        rank,
-        embl_code,
-        division_id,
-        inherited_div,
-        genetic_code,
-        inherited_gc,
-        mito_gc,
-        inherited_mgc,
-        genbank_hidden,
-        subtree_hidden,
-        comments
+        row.tax_id,
+        row.parent,
+        row.rank,
+        row.embl_code,
+        row.division_id,
+        row.inherited_div,
+        row.genetic_code,
+        row.inherited_gc,
+        row.mito_gc,
+        row.inherited_mgc,
+        row.genbank_hidden,
+        row.subtree_hidden,
+        row.comments
     )
 }
 
@@ -335,21 +340,24 @@ where
         }
 
         // Write nodes.dmp entry with all fields
+        let tax_id_str = format!("{}", &key);
         write_nodes_row(
             &mut node_writer,
-            &format!("{}", &key),
-            &parent,
-            rank.to_ncbi_rank(),
-            embl_code,
-            division_id,
-            inherited_div_flag,
-            genetic_code_id,
-            inherited_GC_flag,
-            mitochondrial_genetic_code_id,
-            inherited_MGC_flag,
-            GenBank_hidden_flag,
-            hidden_subtree_root_flag,
-            comments,
+            &NodesRow {
+                tax_id: &tax_id_str,
+                parent: &parent,
+                rank: rank.to_ncbi_rank(),
+                embl_code,
+                division_id,
+                inherited_div: inherited_div_flag,
+                genetic_code: genetic_code_id,
+                inherited_gc: inherited_GC_flag,
+                mito_gc: mitochondrial_genetic_code_id,
+                inherited_mgc: inherited_MGC_flag,
+                genbank_hidden: GenBank_hidden_flag,
+                subtree_hidden: hidden_subtree_root_flag,
+                comments,
+            },
         )?;
     }
 
