@@ -204,10 +204,7 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
 }
 
 /// Helper function to write a single row to nodes.dmp
-fn write_nodes_row(
-    writer: &mut BufWriter<std::fs::File>,
-    row: &NodesRow,
-) -> std::io::Result<()> {
+fn write_nodes_row(writer: &mut BufWriter<std::fs::File>, row: &NodesRow) -> std::io::Result<()> {
     writeln!(
         writer,
         "{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|\t{}\t|",
