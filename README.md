@@ -11,7 +11,7 @@ This library was developed initially as a component in One Codex's metagenomic c
 The library ships with a number of features:
  - [X] Common support for taxonomy handling across Rust and Python
  - [X] Fast and low(er) memory usage
- - [X] NCBI taxonomy, JSON ("tree" and "node_link_data" formats), Newick, and PhyloXML support
+ - [X] NCBI taxonomy, JSON ("tree" and "node_link_data" formats), Newick, PhyloXML, and Parquet support
  - [X] Easily extensible (in Rust) to support other formats and operations
 
 
@@ -47,6 +47,8 @@ of the tree or node_link_data types and will be automatically detected (more det
 
 5. `Taxonomy.from_gtdb(value: &str)`: loads a Taxonomy from a GTDB-encoded string. **Experimental**
 
+6. `Taxonomy.from_parquet(path: str)`: loads a Taxonomy from a Parquet file. The file must contain columns: `tax_id` (str), `parent_id` (str), `name` (str), `rank` (str), `parent_distance` (float32).
+
 ### Exporting a taxonomy
 
 Assuming that the taxonomy has been instantiated as a variable named `tax`.
@@ -54,6 +56,7 @@ Assuming that the taxonomy has been instantiated as a variable named `tax`.
 1. `tax.to_newick()`: exports a Taxonomy as a Newick-encoded byte string.
 2. `tax.to_json_tree()`: exports a Taxonomy as a JSON-encoded byte string in a tree format
 3. `tax.to_json_node_links()`: exports a Taxonomy as a JSON-encoded byte string in a node links format
+4. `tax.to_parquet(path: str)`: exports a Taxonomy to a Parquet file with columns: `tax_id`, `parent_id`, `name`, `rank`, `parent_distance`.
 
 ### Using a taxonomy
 

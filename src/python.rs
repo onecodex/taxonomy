@@ -16,7 +16,7 @@ use crate::base::InternalIndex;
 use crate::json::JsonFormat;
 use crate::rank::TaxRank;
 use crate::Taxonomy as TaxonomyTrait;
-use crate::{gtdb, json, ncbi, newick, phyloxml, prune_away, prune_to, GeneralTaxonomy};
+use crate::{gtdb, json, ncbi, newick, parquet, phyloxml, prune_away, prune_to, GeneralTaxonomy};
 
 create_exception!(taxonomy, TaxonomyError, pyo3::exceptions::PyException);
 
@@ -225,6 +225,19 @@ impl Taxonomy {
         Ok(Taxonomy { tax })
     }
 
+    /// from_parquet(cls, path: str)
+    /// --
+    ///
+    /// Load a Taxonomy from a Parquet file.
+    ///
+    /// The file must contain columns: tax_id (str), parent_id (str),
+    /// name (str), rank (str), parent_distance (float32).
+    #[classmethod]
+    fn from_parquet(_cls: &PyType, path: &str) -> PyResult<Taxonomy> {
+        let tax = py_try!(parquet::load(path));
+        Ok(Taxonomy { tax })
+    }
+
     /// clone(self)
     /// --
     ///
@@ -273,6 +286,18 @@ impl Taxonomy {
     ///     output_dir: Path to the directory where nodes.dmp and names.dmp will be written
     fn to_ncbi(&self, output_dir: &str) -> PyResult<()> {
         py_try!(ncbi::save::<&str, _, _>(&self.tax, output_dir));
+        Ok(())
+    }
+
+    /// to_parquet(self, path: str)
+    /// --
+    ///
+    /// Export a Taxonomy to a Parquet file.
+    ///
+    /// The file will contain columns: tax_id (str), parent_id (str),
+    /// name (str), rank (str), parent_distance (float32).
+    fn to_parquet(&self, path: &str) -> PyResult<()> {
+        py_try!(parquet::save::<&str, _, _>(&self.tax, path));
         Ok(())
     }
 

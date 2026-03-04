@@ -79,4 +79,26 @@ impl From<quick_xml::Error> for Error {
     }
 }
 
+impl From<parquet::errors::ParquetError> for Error {
+    fn from(error: parquet::errors::ParquetError) -> Self {
+        let mut err = Error::new(ErrorKind::ImportError {
+            line: 0,
+            msg: error.to_string(),
+        });
+        err.source = Some(Box::new(error));
+        err
+    }
+}
+
+impl From<arrow::error::ArrowError> for Error {
+    fn from(error: arrow::error::ArrowError) -> Self {
+        let mut err = Error::new(ErrorKind::ImportError {
+            line: 0,
+            msg: error.to_string(),
+        });
+        err.source = Some(Box::new(error));
+        err
+    }
+}
+
 pub type TaxonomyResult<T> = Result<T, Error>;

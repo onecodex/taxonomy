@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 #[cfg(any(feature = "python", feature = "python_test"))]
 extern crate pyo3;
 
@@ -18,5 +20,6 @@ pub use formats::gtdb;
 pub use formats::json;
 pub use formats::ncbi;
 pub use formats::newick;
+pub use formats::parquet;
 pub use formats::phyloxml;
 pub use rank::TaxRank;

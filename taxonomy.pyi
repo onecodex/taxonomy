@@ -55,12 +55,31 @@ class Taxonomy:
         ...
 
     @classmethod
+    def from_parquet(cls, value: str) -> "Taxonomy":
+        """
+        Load a Taxonomy from a Parquet file.
+
+        The file must contain columns: tax_id (str), parent_id (str),
+        name (str), rank (str), parent_distance (float32).
+        """
+        ...
+
+    @classmethod
     def from_phyloxml(cls, value: str) -> "Taxonomy":
         """Load a Taxonomy from a PhyloXML-encoded string. Experimental."""
         ...
 
     def clone(self) -> "Taxonomy":
         """Clone the current taxonomy"""
+        ...
+
+    def to_parquet(self, path: str) -> None:
+        """
+        Export a Taxonomy to a Parquet file.
+
+        The file will contain columns: tax_id (str), parent_id (str),
+        name (str), rank (str), parent_distance (float32).
+        """
         ...
 
     def to_json_tree(self) -> bytes:

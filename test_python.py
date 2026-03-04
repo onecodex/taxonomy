@@ -510,8 +510,19 @@ def test_gtdb_invalid_format():
             Taxonomy.from_gtdb(file.read())
 
 
+def test_parquet():
+    tax = Taxonomy.from_ncbi("tests/data/")
+    tax.to_parquet("tests/data/taxonomy.parquet")
+    assert os.path.exists("tests/data/taxonomy.parquet")
+
+    tax = Taxonomy.from_parquet("tests/data/taxonomy.parquet")
+    assert len(tax) == 10
+    assert len(tax.lineage("561")) == 8
+
+
 @pytest.mark.skipif(
-    not os.getenv("TAXONOMY_TEST_NCBI"), reason="Define TAXONOMY_TEST_NCBI to run NCBI test"
+    not os.getenv("TAXONOMY_TEST_NCBI"),
+    reason="Define TAXONOMY_TEST_NCBI to run NCBI test",
 )
 def test_latestncbi_load_latest_ncbi_taxonomy():
     download("https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz")
