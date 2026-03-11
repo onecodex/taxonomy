@@ -170,7 +170,6 @@ impl TaxonomyNode {
             Ok(py.None())
         }
     }
-
 }
 
 /// The Taxonomy object provides the primary interface for exploring a
