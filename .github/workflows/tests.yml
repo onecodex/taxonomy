@@ -39,23 +39,11 @@ jobs:
       - name: version info
         run:  rustc --version; cargo --version;
 
+      - name: Setup Python bindings
+        uses: ./.github/actions/setup-python-bindings
+
       - name: Run all tests
         run: cargo test --features=python_test
-
-      - name: Install python headers
-        run: sudo apt-get update && sudo apt-get install python3-dev python3-pip python3-venv
-
-      - name: Install maturin
-        run: |
-          python3 -m venv venv
-          . venv/bin/activate
-          pip3 install maturin downloads pytest
-          pip3 show maturin
-
-      - name: add library to venv
-        run: |
-          . venv/bin/activate
-          maturin develop --features=python
 
       - name: Run the python tests
         run: |
