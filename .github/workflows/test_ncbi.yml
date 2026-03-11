@@ -20,21 +20,8 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Install python headers
-        run: sudo apt-get update && sudo apt-get install -y python3-dev python3-pip python3-venv
-
-      - name: Install python dependencies
-        run: |
-          python3 -m venv venv
-          . venv/bin/activate
-          pip install --upgrade pip
-          pip install maturin downloads pytest
-          pip show maturin
-
-      - name: Add library to venv
-        run: |
-          . venv/bin/activate
-          maturin develop --features=python
+      - name: Setup Python bindings
+        uses: ./.github/actions/setup-python-bindings
 
       - name: Test Python bindings with latest NCBI taxonomy
         run: |
