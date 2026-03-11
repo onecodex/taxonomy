@@ -171,26 +171,6 @@ impl TaxonomyNode {
         }
     }
 
-    /// Convenience properties for common NCBI fields
-    #[getter]
-    fn genetic_code_id(&self, py: Python<'_>) -> PyResult<PyObject> {
-        self.get("genetic_code_id", None, py)
-    }
-
-    #[getter]
-    fn embl_code(&self, py: Python<'_>) -> PyResult<PyObject> {
-        self.get("embl_code", None, py)
-    }
-
-    #[getter]
-    fn division_id(&self, py: Python<'_>) -> PyResult<PyObject> {
-        self.get("division_id", None, py)
-    }
-
-    #[getter]
-    fn mitochondrial_genetic_code_id(&self, py: Python<'_>) -> PyResult<PyObject> {
-        self.get("mitochondrial_genetic_code_id", None, py)
-    }
 }
 
 /// The Taxonomy object provides the primary interface for exploring a
