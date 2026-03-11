@@ -351,7 +351,11 @@ impl Taxonomy {
     ///                      If False, only write basic taxonomy structure.
     #[pyo3(signature = (output_dir, include_extended=true))]
     fn to_ncbi(&self, output_dir: &str, include_extended: bool) -> PyResult<()> {
-        py_try!(ncbi::save::<&str, _, _>(&self.tax, output_dir, include_extended));
+        py_try!(ncbi::save::<&str, _, _>(
+            &self.tax,
+            output_dir,
+            include_extended
+        ));
         Ok(())
     }
 

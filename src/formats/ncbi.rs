@@ -308,9 +308,18 @@ where
         // Extract data fields with proper types
         let node_data = tax.data(key.clone())?;
 
-        let (embl_code, division_id, inherited_div_flag, genetic_code_id,
-             inherited_gc_flag, mitochondrial_genetic_code_id, inherited_mgc_flag,
-             genbank_hidden_flag, hidden_subtree_root_flag, comments) = if include_extended {
+        let (
+            embl_code,
+            division_id,
+            inherited_div_flag,
+            genetic_code_id,
+            inherited_gc_flag,
+            mitochondrial_genetic_code_id,
+            inherited_mgc_flag,
+            genbank_hidden_flag,
+            hidden_subtree_root_flag,
+            comments,
+        ) = if include_extended {
             // Extract extended fields from data
             let embl_code = node_data
                 .get("embl_code")
@@ -361,14 +370,32 @@ where
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
 
-            (embl_code, division_id, inherited_div_flag, genetic_code_id,
-             inherited_gc_flag, mitochondrial_genetic_code_id, inherited_mgc_flag,
-             genbank_hidden_flag, hidden_subtree_root_flag, comments)
+            (
+                embl_code,
+                division_id,
+                inherited_div_flag,
+                genetic_code_id,
+                inherited_gc_flag,
+                mitochondrial_genetic_code_id,
+                inherited_mgc_flag,
+                genbank_hidden_flag,
+                hidden_subtree_root_flag,
+                comments,
+            )
         } else {
             // Use empty/default values for backwards compatibility
-            ("", "".to_string(), "", "".to_string(),
-             "", "".to_string(), "",
-             "", "", "")
+            (
+                "",
+                "".to_string(),
+                "",
+                "".to_string(),
+                "",
+                "".to_string(),
+                "",
+                "",
+                "",
+                "",
+            )
         };
 
         // Write scientific name
