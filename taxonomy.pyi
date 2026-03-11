@@ -99,19 +99,6 @@ class Taxonomy:
         """Export a Taxonomy as a JSON-encoded byte string in a tree format"""
         ...
 
-    def to_json_tree_streaming(self) -> bytes:
-        """
-        Export a Taxonomy as a JSON-encoded byte string in a tree format.
-
-        This version uses streaming/incremental writing for much better memory
-        efficiency with large taxonomies (e.g., full NCBI taxonomy with 2.5M+ nodes).
-
-        Unlike to_json_tree(), which builds the entire tree structure in memory
-        before serialization, this writes JSON directly as it traverses the tree.
-        Use this for large NCBI taxonomies to avoid high memory usage.
-        """
-        ...
-
     def to_json_node_links(self) -> bytes:
         """Export a Taxonomy as a JSON-encoded byte string in a node link format"""
         ...

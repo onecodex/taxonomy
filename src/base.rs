@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -109,9 +108,7 @@ impl From<TaxonomyValue> for serde_json::Value {
     fn from(value: TaxonomyValue) -> Self {
         match value {
             TaxonomyValue::String(s) => serde_json::Value::String(s),
-            TaxonomyValue::Integer(i) => {
-                serde_json::Value::Number(serde_json::Number::from(i))
-            }
+            TaxonomyValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(i)),
             TaxonomyValue::Float(f) => serde_json::Value::Number(
                 serde_json::Number::from_f64(f).unwrap_or(serde_json::Number::from(0)),
             ),
@@ -134,9 +131,7 @@ impl From<&TaxonomyValue> for serde_json::Value {
     fn from(value: &TaxonomyValue) -> Self {
         match value {
             TaxonomyValue::String(s) => serde_json::Value::String(s.clone()),
-            TaxonomyValue::Integer(i) => {
-                serde_json::Value::Number(serde_json::Number::from(*i))
-            }
+            TaxonomyValue::Integer(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
             TaxonomyValue::Float(f) => serde_json::Value::Number(
                 serde_json::Number::from_f64(*f).unwrap_or(serde_json::Number::from(0)),
             ),
@@ -158,7 +153,7 @@ impl From<&TaxonomyValue> for serde_json::Value {
 /// It include 2 implementations of the [Taxonomy] trait: one using strings as ids
 /// (easier to use but slower) and one using internal indices (harder to use but faster).
 /// Most fields are public for flexibility reason.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct GeneralTaxonomy {
     pub tax_ids: Vec<String>,
     pub parent_ids: Vec<InternalIndex>,
@@ -363,13 +358,39 @@ impl GeneralTaxonomy {
 
     /// Retrieves all external IDs given a name
     pub fn find_all_by_name(&self, name: &str) -> Vec<&str> {
-        let name_indices = self
+        let mut name_indices = self
             .names
             .iter()
             .enumerate()
             .filter(|(_, val)| val == &name)
             .map(|(pos, _)| pos)
             .collect::<Vec<usize>>();
+
+        // Also search alternative names in the data field
+        for (idx, node_data) in self.data.iter().enumerate() {
+            if name_indices.contains(&idx) {
+                continue; // Already found by scientific name
+            }
+
+            if let Some(names_value) = node_data.get("names") {
+                if let Some(names_array) = names_value.as_array() {
+                    let has_match = names_array.iter().any(|name_obj| {
+                        if let Some(name_map) = name_obj.as_object() {
+                            if let Some(name_text) = name_map.get("name_text") {
+                                if let Some(text) = name_text.as_str() {
+                                    return text == name;
+                                }
+                            }
+                        }
+                        false
+                    });
+
+                    if has_match {
+                        name_indices.push(idx);
+                    }
+                }
+            }
+        }
 
         name_indices
             .iter()
@@ -558,7 +579,10 @@ impl<'t> Taxonomy<'t, InternalIndex> for GeneralTaxonomy {
         }
     }
 
-    fn data(&'t self, idx: InternalIndex) -> TaxonomyResult<Cow<'t, HashMap<String, TaxonomyValue>>> {
+    fn data(
+        &'t self,
+        idx: InternalIndex,
+    ) -> TaxonomyResult<Cow<'t, HashMap<String, TaxonomyValue>>> {
         if let Some(data) = self.data.get(idx) {
             Ok(Cow::Borrowed(data))
         } else {

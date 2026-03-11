@@ -10,9 +10,8 @@ use pyo3::create_exception;
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList, PyType};
-use serde_json::Value;
 
-use crate::base::InternalIndex;
+use crate::base::{InternalIndex, TaxonomyValue};
 use crate::json::JsonFormat;
 use crate::rank::TaxRank;
 use crate::Taxonomy as TaxonomyTrait;
@@ -30,18 +29,14 @@ macro_rules! py_try {
     };
 }
 
-fn json_value_to_pyobject(val: &Value) -> PyObject {
+fn json_value_to_pyobject(val: &TaxonomyValue) -> PyObject {
     Python::with_gil(|py| match val {
-        Value::Null => py.None(),
-        Value::Bool(b) => b.to_object(py),
-        Value::Number(n) => {
-            if let Some(n1) = n.as_i64() {
-                return n1.to_object(py);
-            }
-            n.as_f64().unwrap().to_object(py)
-        }
-        Value::String(s) => s.to_object(py),
-        Value::Array(arr) => {
+        TaxonomyValue::Null => py.None(),
+        TaxonomyValue::Bool(b) => b.to_object(py),
+        TaxonomyValue::Integer(n) => n.to_object(py),
+        TaxonomyValue::Float(f) => f.to_object(py),
+        TaxonomyValue::String(s) => s.to_object(py),
+        TaxonomyValue::Array(arr) => {
             let pylist = PyList::empty(py);
             for v in arr {
                 pylist
@@ -50,7 +45,7 @@ fn json_value_to_pyobject(val: &Value) -> PyObject {
             }
             pylist.to_object(py)
         }
-        Value::Object(obj) => {
+        TaxonomyValue::Object(obj) => {
             let pydict = PyDict::new(py);
             for (key, val) in obj.iter() {
                 pydict
@@ -64,7 +59,7 @@ fn json_value_to_pyobject(val: &Value) -> PyObject {
 
 /// The data returned when looking up a taxonomy by id or by name
 #[pyclass]
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TaxonomyNode {
     #[pyo3(get)]
     id: String,
@@ -75,7 +70,7 @@ pub struct TaxonomyNode {
     #[pyo3(get)]
     rank: String,
     // Ideally this would be private
-    extra: HashMap<String, Value>,
+    extra: HashMap<String, TaxonomyValue>,
 }
 
 #[pymethods]
@@ -318,9 +313,6 @@ impl Taxonomy {
     /// --
     ///
     /// Export a Taxonomy as a JSON-encoded byte string in a tree format
-    /// Suggest using to_json_tree_streaming instead for large trees
-    /// with additional data available in the tree, this function may now OOM for users
-    /// perhaps limit this function to outputting the few fields previously available
     fn to_json_tree(&self, py: Python<'_>) -> PyResult<PyObject> {
         let mut bytes = Vec::new();
         py_try!(json::save::<_, &str, _>(
@@ -328,23 +320,6 @@ impl Taxonomy {
             &self.tax,
             JsonFormat::Tree,
             None
-        ));
-        Ok(PyBytes::new(py, &bytes).into())
-    }
-
-    /// to_json_tree_streaming(self)
-    /// --
-    ///
-    /// Export a Taxonomy as a JSON-encoded byte string in a tree format.
-    /// This version uses streaming/incremental writing for much better memory
-    /// efficiency with large taxonomies (e.g., full NCBI taxonomy with 2.5M+ nodes).
-    ///
-    /// Unlike to_json_tree(), which builds the entire tree structure in memory
-    /// before serialization, this writes JSON directly as it traverses the tree.
-    fn to_json_tree_streaming(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let mut bytes = Vec::new();
-        py_try!(json::save_tree_streaming::<_, &str, _>(
-            &mut bytes, &self.tax, None
         ));
         Ok(PyBytes::new(py, &bytes).into())
     }

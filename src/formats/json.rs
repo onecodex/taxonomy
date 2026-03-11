@@ -402,10 +402,8 @@ where
         }
         let data = tax.data(tax_id.clone())?;
         // Convert TaxonomyValue to serde_json::Value
-        let extra: HashMap<String, Value> = data
-            .iter()
-            .map(|(k, v)| (k.clone(), v.into()))
-            .collect();
+        let extra: HashMap<String, Value> =
+            data.iter().map(|(k, v)| (k.clone(), v.into())).collect();
 
         let node = TaxNodeTree {
             id: tax_id.to_string(),
@@ -435,10 +433,8 @@ where
         for (ix, (tid, _pre)) in tax.traverse(root_id)?.filter(|x| x.1).enumerate() {
             let data = tax.data(tid.clone())?;
             // Convert TaxonomyValue to serde_json::Value
-            let extra: HashMap<String, Value> = data
-                .iter()
-                .map(|(k, v)| (k.clone(), v.into()))
-                .collect();
+            let extra: HashMap<String, Value> =
+                data.iter().map(|(k, v)| (k.clone(), v.into())).collect();
 
             let node = TaxNode {
                 id: tid.to_string(),
