@@ -39,18 +39,19 @@ jobs:
       - name: version info
         run:  rustc --version; cargo --version;
 
+      - name: Install python headers
+        run: sudo apt-get update && sudo apt-get install -y python3-dev python3-pip python3-venv
+
       - name: Run all tests
         run: cargo test --features=python_test
-
-      - name: Install python headers
-        run: sudo apt-get update && sudo apt-get install python3-dev python3-pip python3-venv
 
       - name: Install maturin
         run: |
           python3 -m venv venv
           . venv/bin/activate
-          pip3 install maturin downloads pytest
-          pip3 show maturin
+          pip install --upgrade pip
+          pip install maturin downloads pytest
+          pip show maturin
 
       - name: add library to venv
         run: |
