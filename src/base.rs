@@ -3,13 +3,156 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
-use serde_json::Value;
-
 use crate::errors::{Error, ErrorKind, TaxonomyResult};
 use crate::rank::TaxRank;
 use crate::taxonomy::Taxonomy;
 
 pub type InternalIndex = usize;
+
+/// Native Rust type for storing arbitrary taxonomy data without serde dependency
+#[derive(Clone, Debug, PartialEq)]
+pub enum TaxonomyValue {
+    String(String),
+    Integer(i64),
+    Float(f64),
+    Bool(bool),
+    Array(Vec<TaxonomyValue>),
+    Object(HashMap<String, TaxonomyValue>),
+    Null,
+}
+
+impl TaxonomyValue {
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            TaxonomyValue::String(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            TaxonomyValue::Integer(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            TaxonomyValue::Float(f) => Some(*f),
+            TaxonomyValue::Integer(i) => Some(*i as f64),
+            _ => None,
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            TaxonomyValue::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    pub fn as_array(&self) -> Option<&Vec<TaxonomyValue>> {
+        match self {
+            TaxonomyValue::Array(arr) => Some(arr),
+            _ => None,
+        }
+    }
+
+    pub fn as_array_mut(&mut self) -> Option<&mut Vec<TaxonomyValue>> {
+        match self {
+            TaxonomyValue::Array(arr) => Some(arr),
+            _ => None,
+        }
+    }
+
+    pub fn as_object(&self) -> Option<&HashMap<String, TaxonomyValue>> {
+        match self {
+            TaxonomyValue::Object(obj) => Some(obj),
+            _ => None,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        matches!(self, TaxonomyValue::Null)
+    }
+}
+
+// Conversion functions for interop with serde_json (used only in format modules)
+impl From<serde_json::Value> for TaxonomyValue {
+    fn from(value: serde_json::Value) -> Self {
+        match value {
+            serde_json::Value::String(s) => TaxonomyValue::String(s),
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    TaxonomyValue::Integer(i)
+                } else if let Some(f) = n.as_f64() {
+                    TaxonomyValue::Float(f)
+                } else {
+                    TaxonomyValue::Null
+                }
+            }
+            serde_json::Value::Bool(b) => TaxonomyValue::Bool(b),
+            serde_json::Value::Array(arr) => {
+                TaxonomyValue::Array(arr.into_iter().map(TaxonomyValue::from).collect())
+            }
+            serde_json::Value::Object(obj) => TaxonomyValue::Object(
+                obj.into_iter()
+                    .map(|(k, v)| (k, TaxonomyValue::from(v)))
+                    .collect(),
+            ),
+            serde_json::Value::Null => TaxonomyValue::Null,
+        }
+    }
+}
+
+impl From<TaxonomyValue> for serde_json::Value {
+    fn from(value: TaxonomyValue) -> Self {
+        match value {
+            TaxonomyValue::String(s) => serde_json::Value::String(s),
+            TaxonomyValue::Integer(i) => {
+                serde_json::Value::Number(serde_json::Number::from(i))
+            }
+            TaxonomyValue::Float(f) => serde_json::Value::Number(
+                serde_json::Number::from_f64(f).unwrap_or(serde_json::Number::from(0)),
+            ),
+            TaxonomyValue::Bool(b) => serde_json::Value::Bool(b),
+            TaxonomyValue::Array(arr) => {
+                serde_json::Value::Array(arr.into_iter().map(serde_json::Value::from).collect())
+            }
+            TaxonomyValue::Object(obj) => serde_json::Value::Object(
+                obj.into_iter()
+                    .map(|(k, v)| (k, serde_json::Value::from(v)))
+                    .collect(),
+            ),
+            TaxonomyValue::Null => serde_json::Value::Null,
+        }
+    }
+}
+
+// Also provide borrowed conversions
+impl From<&TaxonomyValue> for serde_json::Value {
+    fn from(value: &TaxonomyValue) -> Self {
+        match value {
+            TaxonomyValue::String(s) => serde_json::Value::String(s.clone()),
+            TaxonomyValue::Integer(i) => {
+                serde_json::Value::Number(serde_json::Number::from(*i))
+            }
+            TaxonomyValue::Float(f) => serde_json::Value::Number(
+                serde_json::Number::from_f64(*f).unwrap_or(serde_json::Number::from(0)),
+            ),
+            TaxonomyValue::Bool(b) => serde_json::Value::Bool(*b),
+            TaxonomyValue::Array(arr) => {
+                serde_json::Value::Array(arr.iter().map(serde_json::Value::from).collect())
+            }
+            TaxonomyValue::Object(obj) => serde_json::Value::Object(
+                obj.iter()
+                    .map(|(k, v)| (k.clone(), serde_json::Value::from(v)))
+                    .collect(),
+            ),
+            TaxonomyValue::Null => serde_json::Value::Null,
+        }
+    }
+}
 
 /// The type that is returned when loading any taxonomies through that library.
 /// It include 2 implementations of the [Taxonomy] trait: one using strings as ids
@@ -22,8 +165,8 @@ pub struct GeneralTaxonomy {
     pub parent_distances: Vec<f32>,
     pub names: Vec<String>,
     pub ranks: Vec<TaxRank>,
-    // Only used by the JSON format
-    pub data: Vec<HashMap<String, Value>>,
+    // Arbitrary data stored for each node using native Rust types
+    pub data: Vec<HashMap<String, TaxonomyValue>>,
 
     // Lookup tables that can dramatically speed up some operations
     pub(crate) tax_id_lookup: HashMap<String, InternalIndex>,
@@ -168,7 +311,7 @@ impl GeneralTaxonomy {
         names: Option<Vec<String>>,
         ranks: Option<Vec<TaxRank>>,
         distances: Option<Vec<f32>>,
-        data: Option<Vec<HashMap<String, Value>>>,
+        data: Option<Vec<HashMap<String, TaxonomyValue>>>,
     ) -> TaxonomyResult<Self> {
         let size = tax_ids.len();
         let adj_names = names.unwrap_or_else(|| vec![String::new(); tax_ids.len()]);
@@ -352,7 +495,7 @@ impl<'t> Taxonomy<'t, &'t str> for GeneralTaxonomy {
         Ok(&self.names[idx])
     }
 
-    fn data(&'t self, tax_id: &str) -> TaxonomyResult<Cow<'t, HashMap<String, Value>>> {
+    fn data(&'t self, tax_id: &str) -> TaxonomyResult<Cow<'t, HashMap<String, TaxonomyValue>>> {
         let idx = self.to_internal_index(tax_id)?;
         Ok(Cow::Borrowed(&self.data[idx]))
     }
@@ -415,7 +558,7 @@ impl<'t> Taxonomy<'t, InternalIndex> for GeneralTaxonomy {
         }
     }
 
-    fn data(&'t self, idx: InternalIndex) -> TaxonomyResult<Cow<'t, HashMap<String, Value>>> {
+    fn data(&'t self, idx: InternalIndex) -> TaxonomyResult<Cow<'t, HashMap<String, TaxonomyValue>>> {
         if let Some(data) = self.data.get(idx) {
             Ok(Cow::Borrowed(data))
         } else {

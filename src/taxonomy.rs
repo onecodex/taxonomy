@@ -1,6 +1,6 @@
+use crate::base::TaxonomyValue;
 use crate::errors::TaxonomyResult;
 use crate::rank::TaxRank;
-use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::{Debug, Display};
@@ -98,9 +98,8 @@ where
     fn name(&'t self, tax_id: T) -> TaxonomyResult<&str>;
 
     /// Returns the additional data at the given tax id node
-    /// This is only used by the json taxonomy so the value is serde_json::Value
     /// By default it just returns an empty hashmap
-    fn data(&'t self, _tax_id: T) -> TaxonomyResult<Cow<'t, HashMap<String, Value>>> {
+    fn data(&'t self, _tax_id: T) -> TaxonomyResult<Cow<'t, HashMap<String, TaxonomyValue>>> {
         Ok(Cow::Owned(HashMap::new()))
     }
 

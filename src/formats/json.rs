@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::io::{Read, Write};
 use std::str::FromStr;
 
-use crate::base::GeneralTaxonomy;
+use crate::base::{GeneralTaxonomy, TaxonomyValue};
 use crate::errors::{Error, ErrorKind, TaxonomyResult};
 use crate::rank::TaxRank;
 use crate::Taxonomy;
@@ -210,14 +210,20 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
     let mut tax_ids: Vec<String> = Vec::with_capacity(tax_nodes.len());
     let mut names: Vec<String> = Vec::with_capacity(tax_nodes.len());
     let mut ranks: Vec<TaxRank> = Vec::with_capacity(tax_nodes.len());
-    let mut data: Vec<HashMap<String, Value>> = Vec::with_capacity(tax_nodes.len());
+    let mut data: Vec<HashMap<String, TaxonomyValue>> = Vec::with_capacity(tax_nodes.len());
     let mut parent_ids = vec![0; tax_nodes.len()];
 
     for node in tax_nodes {
         tax_ids.push(node.id);
         names.push(node.name);
         ranks.push(node.rank);
-        data.push(node.extra);
+        // Convert from serde_json::Value to TaxonomyValue
+        data.push(
+            node.extra
+                .into_iter()
+                .map(|(k, v)| (k, TaxonomyValue::from(v)))
+                .collect(),
+        );
     }
 
     for l in tax_links {
@@ -280,13 +286,19 @@ fn load_tree_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
         parent_ids: &mut Vec<usize>,
         names: &mut Vec<String>,
         ranks: &mut Vec<TaxRank>,
-        data: &mut Vec<HashMap<String, Value>>,
+        data: &mut Vec<HashMap<String, TaxonomyValue>>,
     ) -> TaxonomyResult<()> {
         tax_ids.push(node.id);
         parent_ids.push(parent_loc);
         names.push(node.name);
         ranks.push(node.rank);
-        data.push(node.extra);
+        // Convert from serde_json::Value to TaxonomyValue
+        data.push(
+            node.extra
+                .into_iter()
+                .map(|(k, v)| (k, TaxonomyValue::from(v)))
+                .collect(),
+        );
         let loc = tax_ids.len() - 1;
         for child in node.children {
             add_node(loc, child, tax_ids, parent_ids, names, ranks, data)?;
@@ -369,78 +381,6 @@ where
     Ok(())
 }
 
-/// Memory-efficient streaming tree export that writes JSON incrementally
-/// instead of building the entire tree structure in memory first.
-pub fn save_tree_streaming<'t, W: Write, T, X: Taxonomy<'t, T>>(
-    mut writer: W,
-    taxonomy: &'t X,
-    root_node: Option<T>,
-) -> TaxonomyResult<()>
-where
-    T: 't + Clone + Debug + Display + Eq + Hash + PartialEq,
-{
-    let tax_id = root_node
-        .or_else(|| {
-            if taxonomy.is_empty() {
-                None
-            } else {
-                Some(taxonomy.root())
-            }
-        })
-        .ok_or(Error::new(ErrorKind::InvalidTaxonomy(
-            "Taxonomy must have a root node.".to_string(),
-        )))?;
-
-    write_node_streaming(taxonomy, tax_id, &mut writer)?;
-    writer.flush()?;
-    Ok(())
-}
-
-fn write_node_streaming<'t, W: Write, T>(
-    tax: &'t impl Taxonomy<'t, T>,
-    tax_id: T,
-    writer: &mut W,
-) -> TaxonomyResult<()>
-where
-    T: 't + Clone + Debug + Display + Eq + Hash + PartialEq,
-{
-    write!(writer, "{{")?;
-
-    // Write id
-    write!(writer, "\"id\":")?;
-    to_writer(&mut *writer, &tax_id.to_string())?;
-
-    // Write name
-    write!(writer, ",\"name\":")?;
-    to_writer(&mut *writer, &tax.name(tax_id.clone())?)?;
-
-    // Write rank
-    write!(writer, ",\"rank\":")?;
-    to_writer(&mut *writer, tax.rank(tax_id.clone())?.to_ncbi_rank())?;
-
-    // Write extra data fields
-    let data = tax.data(tax_id.clone())?;
-    for (key, value) in data.iter() {
-        write!(writer, ",{}", serde_json::to_string(key)?)?;
-        write!(writer, ":")?;
-        to_writer(&mut *writer, value)?;
-    }
-
-    // Write children (always include, even if empty, to match regular format)
-    let children = tax.children(tax_id)?;
-    write!(writer, ",\"children\":[")?;
-    for (i, child) in children.into_iter().enumerate() {
-        if i > 0 {
-            write!(writer, ",")?;
-        }
-        write_node_streaming(tax, child, writer)?;
-    }
-    write!(writer, "]")?;
-
-    write!(writer, "}}")?;
-    Ok(())
-}
-
 fn serialize_as_tree<'t, T: 't>(
     taxonomy: &'t impl Taxonomy<'t, T>,
     root_node: Option<T>,
@@ -460,12 +400,19 @@ where
         for child in tax.children(tax_id.clone())? {
             children.push(inner(tax, child)?);
         }
+        let data = tax.data(tax_id.clone())?;
+        // Convert TaxonomyValue to serde_json::Value
+        let extra: HashMap<String, Value> = data
+            .iter()
+            .map(|(k, v)| (k.clone(), v.into()))
+            .collect();
+
         let node = TaxNodeTree {
             id: tax_id.to_string(),
             name: tax.name(tax_id.clone())?.to_string(),
             rank: tax.rank(tax_id.clone())?,
             children,
-            extra: (*tax.data(tax_id)?).clone(),
+            extra,
         };
         Ok(node)
     }
@@ -486,11 +433,18 @@ where
 
     if let Some(root_id) = root_node {
         for (ix, (tid, _pre)) in tax.traverse(root_id)?.filter(|x| x.1).enumerate() {
+            let data = tax.data(tid.clone())?;
+            // Convert TaxonomyValue to serde_json::Value
+            let extra: HashMap<String, Value> = data
+                .iter()
+                .map(|(k, v)| (k.clone(), v.into()))
+                .collect();
+
             let node = TaxNode {
                 id: tid.to_string(),
                 name: tax.name(tid.clone())?.to_string(),
                 rank: tax.rank(tid.clone())?,
-                extra: (*tax.data(tid.clone())?).clone(),
+                extra,
             };
             nodes.push(to_value(&node).unwrap());
             id_to_idx.insert(tid.clone(), ix);
@@ -791,117 +745,5 @@ mod tests {
     fn can_handle_null_ranks() {
         let example = r#"{"id": "1", "rank": null, "name": ""}"#;
         assert!(load(Cursor::new(example), None).is_ok());
-    }
-
-    #[test]
-    fn streaming_tree_matches_regular_tree() {
-        // Create a taxonomy with multiple nodes and extra data
-        let example = r#"{
-            "id": "1",
-            "name": "root",
-            "rank": "no rank",
-            "custom_field": "value1",
-            "children": [
-                {
-                    "id": "2",
-                    "name": "Bacteria",
-                    "rank": "superkingdom",
-                    "genetic_code_id": "11",
-                    "children": [
-                        {
-                            "id": "562",
-                            "name": "Escherichia coli",
-                            "rank": "species",
-                            "genetic_code_id": "11",
-                            "embl_code": "EC",
-                            "division_id": "0",
-                            "name_common_name": "E. coli"
-                        }
-                    ]
-                }
-            ]
-        }"#;
-
-        let tax = load(Cursor::new(example), None).unwrap();
-
-        // Save using regular method
-        let mut regular_output = Vec::new();
-        save::<_, &str, _>(&mut regular_output, &tax, JsonFormat::Tree, None).unwrap();
-
-        // Save using streaming method
-        let mut streaming_output = Vec::new();
-        save_tree_streaming::<_, &str, _>(&mut streaming_output, &tax, None).unwrap();
-
-        // Parse both outputs
-        let regular_json: Value = serde_json::from_slice(&regular_output).unwrap();
-        let streaming_json: Value = serde_json::from_slice(&streaming_output).unwrap();
-
-        // They should be equivalent
-        assert_eq!(regular_json, streaming_json);
-
-        // Verify we can reload from streaming output
-        let tax2 = load(Cursor::new(&streaming_output[..]), None).unwrap();
-        assert_eq!(Taxonomy::<&str>::len(&tax2), 3);
-        assert_eq!(
-            Taxonomy::<&str>::name(&tax2, "562").unwrap(),
-            "Escherichia coli"
-        );
-
-        // Verify extra data is preserved
-        let data = Taxonomy::<&str>::data(&tax2, "562").unwrap();
-        assert_eq!(
-            data.get("genetic_code_id").and_then(|v| v.as_str()),
-            Some("11")
-        );
-        assert_eq!(data.get("embl_code").and_then(|v| v.as_str()), Some("EC"));
-        assert_eq!(
-            data.get("name_common_name").and_then(|v| v.as_str()),
-            Some("E. coli")
-        );
-    }
-
-    #[test]
-    fn streaming_handles_large_data_fields() {
-        // Test that streaming handles nodes with lots of extra fields (like NCBI data)
-        let example = r#"{
-            "id": "562",
-            "name": "Escherichia coli",
-            "rank": "species",
-            "genetic_code_id": "11",
-            "division_id": "0",
-            "inherited_div_flag": "1",
-            "mitochondrial_genetic_code_id": "0",
-            "inherited_MGC_flag": "1",
-            "GenBank_hidden_flag": "0",
-            "hidden_subtree_root_flag": "0",
-            "comments": "",
-            "name_scientific_name": "Escherichia coli",
-            "name_common_name": "E. coli",
-            "name_synonym": "Bacterium coli",
-            "name_authority": "Escherichia coli (Migula 1895) Castellani and Chalmers 1919"
-        }"#;
-
-        let tax = load(Cursor::new(example), None).unwrap();
-
-        let mut streaming_output = Vec::new();
-        save_tree_streaming::<_, &str, _>(&mut streaming_output, &tax, None).unwrap();
-
-        // Reload and verify all fields preserved
-        let tax2 = load(Cursor::new(&streaming_output[..]), None).unwrap();
-        let data = Taxonomy::<&str>::data(&tax2, "562").unwrap();
-
-        assert_eq!(
-            data.get("genetic_code_id").and_then(|v| v.as_str()),
-            Some("11")
-        );
-        assert_eq!(
-            data.get("name_common_name").and_then(|v| v.as_str()),
-            Some("E. coli")
-        );
-        assert_eq!(
-            data.get("name_synonym").and_then(|v| v.as_str()),
-            Some("Bacterium coli")
-        );
-        assert_eq!(data.get("comments").and_then(|v| v.as_str()), Some(""));
     }
 }
