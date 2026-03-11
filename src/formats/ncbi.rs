@@ -280,12 +280,13 @@ fn write_names_row(
     )
 }
 
-pub fn save<'t, T: 't, P: AsRef<Path>, X: Taxonomy<'t, T>>(
+pub fn save<'t, T, P: AsRef<Path>, X: Taxonomy<'t, T>>(
     tax: &'t X,
     out_dir: P,
+    include_extended: bool,
 ) -> TaxonomyResult<()>
 where
-    T: Clone + Debug + Display + PartialEq,
+    T: 't + Clone + Debug + Display + PartialEq,
 {
     let dir = out_dir.as_ref();
     std::fs::create_dir_all(dir)?;
@@ -306,54 +307,69 @@ where
 
         // Extract data fields with proper types
         let node_data = tax.data(key.clone())?;
-        let embl_code = node_data
-            .get("embl_code")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let division_id = node_data
-            .get("division_id")
-            .and_then(|v| v.as_i64())
-            .map(|i| i.to_string())
-            .unwrap_or_else(|| "".to_string());
-        let inherited_div_flag = node_data
-            .get("inherited_div_flag")
-            .and_then(|v| v.as_bool())
-            .map(|b| if b { "1" } else { "0" })
-            .unwrap_or("");
-        let genetic_code_id = node_data
-            .get("genetic_code_id")
-            .and_then(|v| v.as_i64())
-            .map(|i| i.to_string())
-            .unwrap_or_else(|| "".to_string());
-        let inherited_gc_flag = node_data
-            .get("inherited_gc_flag")
-            .and_then(|v| v.as_bool())
-            .map(|b| if b { "1" } else { "0" })
-            .unwrap_or("");
-        let mitochondrial_genetic_code_id = node_data
-            .get("mitochondrial_genetic_code_id")
-            .and_then(|v| v.as_i64())
-            .map(|i| i.to_string())
-            .unwrap_or_else(|| "".to_string());
-        let inherited_mgc_flag = node_data
-            .get("inherited_mgc_flag")
-            .and_then(|v| v.as_bool())
-            .map(|b| if b { "1" } else { "0" })
-            .unwrap_or("");
-        let genbank_hidden_flag = node_data
-            .get("genbank_hidden_flag")
-            .and_then(|v| v.as_bool())
-            .map(|b| if b { "1" } else { "0" })
-            .unwrap_or("");
-        let hidden_subtree_root_flag = node_data
-            .get("hidden_subtree_root_flag")
-            .and_then(|v| v.as_bool())
-            .map(|b| if b { "1" } else { "0" })
-            .unwrap_or("");
-        let comments = node_data
-            .get("comments")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+
+        let (embl_code, division_id, inherited_div_flag, genetic_code_id,
+             inherited_gc_flag, mitochondrial_genetic_code_id, inherited_mgc_flag,
+             genbank_hidden_flag, hidden_subtree_root_flag, comments) = if include_extended {
+            // Extract extended fields from data
+            let embl_code = node_data
+                .get("embl_code")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let division_id = node_data
+                .get("division_id")
+                .and_then(|v| v.as_i64())
+                .map(|i| i.to_string())
+                .unwrap_or_else(|| "".to_string());
+            let inherited_div_flag = node_data
+                .get("inherited_div_flag")
+                .and_then(|v| v.as_bool())
+                .map(|b| if b { "1" } else { "0" })
+                .unwrap_or("");
+            let genetic_code_id = node_data
+                .get("genetic_code_id")
+                .and_then(|v| v.as_i64())
+                .map(|i| i.to_string())
+                .unwrap_or_else(|| "".to_string());
+            let inherited_gc_flag = node_data
+                .get("inherited_gc_flag")
+                .and_then(|v| v.as_bool())
+                .map(|b| if b { "1" } else { "0" })
+                .unwrap_or("");
+            let mitochondrial_genetic_code_id = node_data
+                .get("mitochondrial_genetic_code_id")
+                .and_then(|v| v.as_i64())
+                .map(|i| i.to_string())
+                .unwrap_or_else(|| "".to_string());
+            let inherited_mgc_flag = node_data
+                .get("inherited_mgc_flag")
+                .and_then(|v| v.as_bool())
+                .map(|b| if b { "1" } else { "0" })
+                .unwrap_or("");
+            let genbank_hidden_flag = node_data
+                .get("genbank_hidden_flag")
+                .and_then(|v| v.as_bool())
+                .map(|b| if b { "1" } else { "0" })
+                .unwrap_or("");
+            let hidden_subtree_root_flag = node_data
+                .get("hidden_subtree_root_flag")
+                .and_then(|v| v.as_bool())
+                .map(|b| if b { "1" } else { "0" })
+                .unwrap_or("");
+            let comments = node_data
+                .get("comments")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            (embl_code, division_id, inherited_div_flag, genetic_code_id,
+             inherited_gc_flag, mitochondrial_genetic_code_id, inherited_mgc_flag,
+             genbank_hidden_flag, hidden_subtree_root_flag, comments)
+        } else {
+            // Use empty/default values for backwards compatibility
+            ("", "".to_string(), "", "".to_string(),
+             "", "".to_string(), "",
+             "", "", "")
+        };
 
         // Write scientific name
         write_names_row(
@@ -364,20 +380,22 @@ where
             "scientific name",
         )?;
 
-        // Write all alternative names from data
-        if let Some(names_value) = node_data.get("names") {
-            if let Some(names_array) = names_value.as_array() {
-                for name_value in names_array {
-                    if let Some(tax_name) = TaxonomyName::from_taxonomy_value(name_value) {
-                        // Skip scientific name as it's already written above
-                        if tax_name.name_class != "scientific name" {
-                            write_names_row(
-                                &mut name_writer,
-                                &format!("{}", &key),
-                                &tax_name.name_text,
-                                tax_name.unique_name.as_deref().unwrap_or(""),
-                                &tax_name.name_class,
-                            )?;
+        // Write all alternative names from data (only if extended fields are included)
+        if include_extended {
+            if let Some(names_value) = node_data.get("names") {
+                if let Some(names_array) = names_value.as_array() {
+                    for name_value in names_array {
+                        if let Some(tax_name) = TaxonomyName::from_taxonomy_value(name_value) {
+                            // Skip scientific name as it's already written above
+                            if tax_name.name_class != "scientific name" {
+                                write_names_row(
+                                    &mut name_writer,
+                                    &format!("{}", &key),
+                                    &tax_name.name_text,
+                                    tax_name.unique_name.as_deref().unwrap_or(""),
+                                    &tax_name.name_class,
+                                )?;
+                            }
                         }
                     }
                 }
@@ -537,7 +555,7 @@ mod tests {
         assert_eq!(common_name, "E. coli");
 
         let out = path.join("out");
-        save::<&str, _, _>(&tax, &out).unwrap();
+        save::<&str, _, _>(&tax, &out, true).unwrap();
 
         // now load again and validate a few taxids
         let tax2 = load(&out).unwrap();

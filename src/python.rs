@@ -339,7 +339,7 @@ impl Taxonomy {
         Ok(PyBytes::new(py, &bytes).into())
     }
 
-    /// to_ncbi(self, output_dir: str)
+    /// to_ncbi(self, output_dir: str, /, include_extended: bool = True)
     /// --
     ///
     /// Export a Taxonomy to NCBI format files (nodes.dmp and names.dmp).
@@ -347,8 +347,11 @@ impl Taxonomy {
     ///
     /// Args:
     ///     output_dir: Path to the directory where nodes.dmp and names.dmp will be written
-    fn to_ncbi(&self, output_dir: &str) -> PyResult<()> {
-        py_try!(ncbi::save::<&str, _, _>(&self.tax, output_dir));
+    ///     include_extended: If True (default), include all NCBI-specific fields and alternative names.
+    ///                      If False, only write basic taxonomy structure.
+    #[pyo3(signature = (output_dir, include_extended=true))]
+    fn to_ncbi(&self, output_dir: &str, include_extended: bool) -> PyResult<()> {
+        py_try!(ncbi::save::<&str, _, _>(&self.tax, output_dir, include_extended));
         Ok(())
     }
 

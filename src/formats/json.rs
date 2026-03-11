@@ -381,12 +381,12 @@ where
     Ok(())
 }
 
-fn serialize_as_tree<'t, T: 't>(
+fn serialize_as_tree<'t, T>(
     taxonomy: &'t impl Taxonomy<'t, T>,
     root_node: Option<T>,
 ) -> TaxonomyResult<Value>
 where
-    T: Clone + Debug + Display + Eq + Hash + PartialEq,
+    T: 't + Clone + Debug + Display + Eq + Hash + PartialEq,
 {
     let tax_id = root_node.ok_or(Error::new(ErrorKind::InvalidTaxonomy(
         "Taxonomy must have a root node.".to_string(),
