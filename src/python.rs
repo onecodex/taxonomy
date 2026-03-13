@@ -627,6 +627,7 @@ impl TaxonomyIterator {
 #[pymodule]
 fn taxonomy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Taxonomy>()?;
+    m.add_class::<TaxonomyNode>()?;
     m.add("TaxonomyError", py.get_type::<TaxonomyError>())?;
 
     Ok(())
