@@ -292,6 +292,7 @@ impl GeneralTaxonomy {
         self.parent_distances.remove(idx);
         self.ranks.remove(idx);
         self.names.remove(idx);
+        self.data.remove(idx);
 
         // everything after `tax_id` in parents needs to get decremented by 1
         // because we've changed the actual array size
