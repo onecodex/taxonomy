@@ -292,11 +292,14 @@ impl GeneralTaxonomy {
         self.parent_distances.remove(idx);
         self.ranks.remove(idx);
         self.names.remove(idx);
+        self.data.remove(idx);
 
-        // everything after `tax_id` in parents needs to get decremented by 1
-        // because we've changed the actual array size
-        for parent in self.parent_ids.iter_mut().skip(idx + 1) {
-            if *parent > 0 {
+        // all parent indices pointing to positions after the removed node must be
+        // decremented by 1, because the array shifted. This applies to every element
+        // (not just those after idx), since an out-of-order taxonomy can have parents
+        // with larger indices than their children.
+        for parent in self.parent_ids.iter_mut() {
+            if *parent > idx {
                 *parent -= 1;
             }
         }
@@ -521,6 +524,30 @@ mod tests {
         assert_eq!(tax.lineage("562").unwrap(), vec!["562", "1"]);
         // can't remove root
         assert!(tax.remove("1").is_err());
+    }
+
+    #[test]
+    fn remove_then_add_then_prune_preserves_nodes() {
+        use crate::edit::prune_to;
+
+        // Reproduce DEV-9780: removing a node, adding it back under a new parent,
+        // then pruning should not lose unrelated nodes or panic.
+        let mut tax = create_test_taxonomy();
+
+        // Remove "2" (Bacteria), which is a child of root and parent of "562"
+        tax.remove("2").unwrap();
+
+        // Add "2" back directly under root
+        tax.add("1", "2").unwrap();
+
+        // Prune to keep "562" (E. coli). Before the fix, "562" was unreachable
+        // from root after the remove+add, so the pruned taxonomy was empty.
+        let pruned = prune_to(&tax, &["562"], false).unwrap();
+
+        // "562" must be present and reachable
+        assert!(pruned.to_internal_index("562").is_ok());
+        // Root must be present
+        assert_eq!(Taxonomy::<&str>::root(&pruned), "1");
     }
 
     #[test]
