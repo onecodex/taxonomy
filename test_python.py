@@ -150,8 +150,16 @@ def test_json_internal_index(json_tax: Taxonomy):
     ] == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 
+def test_taxonomy_iterator_is_iterable(newick_tax):
+    it = iter(newick_tax)
+    assert iter(it) is it
+
+
 def test_json_find_all_by_name(json_tax: Taxonomy):
-    assert sorted([n.id for n in json_tax.find_all_by_name("species 1.1")]) == ["10", "12"]
+    assert sorted([n.id for n in json_tax.find_all_by_name("species 1.1")]) == [
+        "10",
+        "12",
+    ]
 
 
 def test_json_edit_node_parent_updates_children(json_tax: Taxonomy):
@@ -475,7 +483,8 @@ def test_ncbi_edit_node_parent():
 def test_ncbi_repr():
     tax = Taxonomy.from_ncbi("tests/data/")
     assert (
-        tax["562"].__repr__() == '<TaxonomyNode (id="562" rank="species" name="Escherichia coli")>'
+        tax["562"].__repr__()
+        == '<TaxonomyNode (id="562" rank="species" name="Escherichia coli")>'
     )
 
 
@@ -511,7 +520,8 @@ def test_gtdb_invalid_format():
 
 
 @pytest.mark.skipif(
-    not os.getenv("TAXONOMY_TEST_NCBI"), reason="Define TAXONOMY_TEST_NCBI to run NCBI test"
+    not os.getenv("TAXONOMY_TEST_NCBI"),
+    reason="Define TAXONOMY_TEST_NCBI to run NCBI test",
 )
 def test_latestncbi_load_latest_ncbi_taxonomy():
     download("https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz")

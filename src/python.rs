@@ -576,6 +576,10 @@ pub struct TaxonomyIterator {
 
 #[pymethods]
 impl TaxonomyIterator {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+
     fn __next__(mut slf: PyRefMut<Self>, py: Python<'_>) -> PyResult<Option<String>> {
         let traverse_preorder = true;
         loop {
