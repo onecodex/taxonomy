@@ -62,6 +62,27 @@ fn json_value_to_pyobject(val: &Value) -> PyObject {
     })
 }
 
+fn pyobject_to_json_value(obj: &PyAny) -> PyResult<Value> {
+    if obj.is_none() {
+        Ok(Value::Null)
+    } else if let Ok(b) = obj.extract::<bool>() {
+        Ok(Value::Bool(b))
+    } else if let Ok(i) = obj.extract::<i64>() {
+        Ok(Value::Number(i.into()))
+    } else if let Ok(f) = obj.extract::<f64>() {
+        let n = serde_json::Number::from_f64(f).ok_or_else(|| {
+            PyErr::new::<TaxonomyError, _>("Cannot convert non-finite float to JSON")
+        })?;
+        Ok(Value::Number(n))
+    } else if let Ok(s) = obj.extract::<String>() {
+        Ok(Value::String(s))
+    } else {
+        Err(PyErr::new::<TaxonomyError, _>(
+            "Cannot convert Python object to JSON value: unsupported type",
+        ))
+    }
+}
+
 /// The data returned when looking up a taxonomy by id or by name
 #[pyclass]
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -123,6 +144,26 @@ impl TaxonomyNode {
             "<TaxonomyNode (id=\"{}\" rank=\"{}\" name=\"{}\")>",
             self.id, self.rank, self.name
         ))
+    }
+
+    #[pyo3(signature = (key, default=None))]
+    fn get(&self, key: &str, default: Option<&PyAny>, py: Python<'_>) -> PyResult<PyObject> {
+        if let Some(val) = self.extra.get(key) {
+            Ok(json_value_to_pyobject(val))
+        } else {
+            Ok(default
+                .map(|d| d.to_object(py))
+                .unwrap_or_else(|| py.None()))
+        }
+    }
+
+    #[getter]
+    fn data(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let d = PyDict::new(py);
+        for (k, v) in &self.extra {
+            d.set_item(k, json_value_to_pyobject(v))?;
+        }
+        Ok(d.to_object(py))
     }
 }
 
@@ -522,6 +563,89 @@ impl Taxonomy {
         }
 
         Ok(())
+    }
+
+    fn set_data(&mut self, node_id: &str, key: &str, value: &PyAny) -> PyResult<()> {
+        let idx = py_try!(self.tax.to_internal_index(node_id));
+        let json_val = pyobject_to_json_value(value)?;
+        self.tax.data[idx].insert(key.to_string(), json_val);
+        Ok(())
+    }
+
+    fn reduce_up(
+        &self,
+        node_id: &str,
+        output_key: &str,
+        fn_: &PyAny,
+        py: Python<'_>,
+    ) -> PyResult<Taxonomy> {
+        let start_idx = py_try!(self.tax.to_internal_index(node_id));
+        let mut results: HashMap<InternalIndex, PyObject> = HashMap::new();
+        let traversal: Vec<(InternalIndex, bool)> = py_try!(
+            TaxonomyTrait::<InternalIndex>::traverse(&self.tax, start_idx)
+        )
+        .collect();
+        let mut new_tax = self.tax.clone();
+
+        for (idx, is_pre) in traversal {
+            if is_pre {
+                continue;
+            }
+            let tax_id = py_try!(self.tax.from_internal_index(idx));
+            let node = self.as_node(tax_id)?;
+            let child_list = PyList::empty(py);
+            for &child_idx in &self.tax.children_lookup[idx] {
+                if let Some(child_result) = results.get(&child_idx) {
+                    child_list.append(child_result)?;
+                }
+            }
+            let result: PyObject = fn_.call1((node.into_py(py), child_list))?.to_object(py);
+            let json_val = pyobject_to_json_value(result.as_ref(py))?;
+            new_tax.data[idx].insert(output_key.to_string(), json_val);
+            results.insert(idx, result);
+        }
+
+        Ok(Taxonomy { tax: new_tax })
+    }
+
+    fn map_down(
+        &self,
+        node_id: &str,
+        output_key: &str,
+        initial: &PyAny,
+        fn_: &PyAny,
+        py: Python<'_>,
+    ) -> PyResult<Taxonomy> {
+        let start_idx = py_try!(self.tax.to_internal_index(node_id));
+        let mut parent_results: HashMap<InternalIndex, PyObject> = HashMap::new();
+        let traversal: Vec<(InternalIndex, bool)> = py_try!(
+            TaxonomyTrait::<InternalIndex>::traverse(&self.tax, start_idx)
+        )
+        .collect();
+        let mut new_tax = self.tax.clone();
+
+        for (idx, is_pre) in traversal {
+            if !is_pre {
+                continue;
+            }
+            let tax_id = py_try!(self.tax.from_internal_index(idx));
+            let node = self.as_node(tax_id)?;
+            let parent_result: &PyAny = if idx == start_idx {
+                initial
+            } else {
+                let pidx = self.tax.parent_ids[idx];
+                parent_results
+                    .get(&pidx)
+                    .map(|r| r.as_ref(py))
+                    .unwrap_or(initial)
+            };
+            let result: PyObject = fn_.call1((parent_result, node.into_py(py)))?.to_object(py);
+            let json_val = pyobject_to_json_value(result.as_ref(py))?;
+            new_tax.data[idx].insert(output_key.to_string(), json_val);
+            parent_results.insert(idx, result);
+        }
+
+        Ok(Taxonomy { tax: new_tax })
     }
 
     #[getter]
