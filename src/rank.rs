@@ -86,6 +86,7 @@ pub enum TaxRank {
     SpeciesSubgroup,
     Species,
     Subspecies,
+    Synthetic,
     Varietas,
     Subvarietas,
     Forma,
@@ -146,6 +147,7 @@ impl TaxRank {
             TaxRank::Species => "species",
             TaxRank::Subspecies => "subspecies",
             TaxRank::Strain => "strain",
+            TaxRank::Synthetic => "synthetic",
             TaxRank::Varietas => "varietas",
             TaxRank::Forma => "forma",
             TaxRank::Unspecified => "no rank",
@@ -237,6 +239,7 @@ impl FromStr for TaxRank {
             "species subgroup" => Ok(TaxRank::SpeciesSubgroup),
             "species" => Ok(TaxRank::Species),
             "subspecies" => Ok(TaxRank::Subspecies),
+            "synthetic" => Ok(TaxRank::Synthetic),
             "variety" | "varietas" => Ok(TaxRank::Varietas),
             "subvariety" | "subvarietas" => Ok(TaxRank::Subvarietas),
             "form" | "forma" => Ok(TaxRank::Forma),
@@ -352,6 +355,7 @@ impl fmt::Display for TaxRank {
             TaxRank::Genotype => "genotype",
             TaxRank::Morph => "morph",
             TaxRank::Pathogroup => "pathogroup",
+            TaxRank::Synthetic => "synthetic",
         };
         write!(f, "{}", rank_str)
     }
@@ -439,6 +443,7 @@ mod test {
         Subvarietas,
         Forma,
         Subforma,
+        Synthetic,
         Cultivar,
         Breed,
         Strain,
