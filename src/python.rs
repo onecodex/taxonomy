@@ -9,7 +9,8 @@ use pyo3::basic::CompareOp;
 use pyo3::create_exception;
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyList, PyType};
+use pyo3::types::{PyAny, PyBytes, PyDict, PyList, PyType};
+use pyo3::IntoPyObjectExt;
 use serde_json::Value;
 
 use crate::base::InternalIndex;
@@ -30,17 +31,17 @@ macro_rules! py_try {
     };
 }
 
-fn json_value_to_pyobject(val: &Value) -> PyObject {
-    Python::with_gil(|py| match val {
+fn json_value_to_pyobject(val: &Value) -> Py<PyAny> {
+    Python::attach(|py| match val {
         Value::Null => py.None(),
-        Value::Bool(b) => b.to_object(py),
+        Value::Bool(b) => b.into_py_any(py).unwrap(),
         Value::Number(n) => {
             if let Some(n1) = n.as_i64() {
-                return n1.to_object(py);
+                return n1.into_py_any(py).unwrap();
             }
-            n.as_f64().unwrap().to_object(py)
+            n.as_f64().unwrap().into_py_any(py).unwrap()
         }
-        Value::String(s) => s.to_object(py),
+        Value::String(s) => s.into_py_any(py).unwrap(),
         Value::Array(arr) => {
             let pylist = PyList::empty(py);
             for v in arr {
@@ -48,7 +49,7 @@ fn json_value_to_pyobject(val: &Value) -> PyObject {
                     .append(json_value_to_pyobject(v))
                     .expect("can add items to list");
             }
-            pylist.to_object(py)
+            pylist.into_any().unbind()
         }
         Value::Object(obj) => {
             let pydict = PyDict::new(py);
@@ -57,7 +58,7 @@ fn json_value_to_pyobject(val: &Value) -> PyObject {
                     .set_item(key, json_value_to_pyobject(val))
                     .expect("can add items to dict");
             }
-            pydict.to_object(py)
+            pydict.into_any().unbind()
         }
     })
 }
@@ -92,22 +93,22 @@ impl TaxonomyNode {
         hasher.finish()
     }
 
-    fn __richcmp__(&self, other: PyRef<TaxonomyNode>, op: CompareOp) -> Py<PyAny> {
+    fn __richcmp__(&self, other: PyRef<TaxonomyNode>, op: CompareOp) -> PyResult<Py<PyAny>> {
         let py = other.py();
         match op {
-            CompareOp::Eq => (self == other.deref()).into_py(py),
-            CompareOp::Ne => (self != other.deref()).into_py(py),
-            _ => py.NotImplemented(),
+            CompareOp::Eq => (self == other.deref()).into_py_any(py),
+            CompareOp::Ne => (self != other.deref()).into_py_any(py),
+            _ => Ok(py.NotImplemented()),
         }
     }
 
-    fn __getitem__(&self, obj: &PyAny, py: Python<'_>) -> PyResult<PyObject> {
+    fn __getitem__(&self, obj: &Bound<'_, PyAny>, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let key: &str = obj.extract()?;
         match key {
-            "id" => Ok(self.id.to_object(py)),
-            "name" => Ok(self.name.to_object(py)),
-            "parent" => Ok(self.parent.to_object(py)),
-            "rank" => Ok(self.rank.to_object(py)),
+            "id" => self.id.as_str().into_py_any(py),
+            "name" => self.name.as_str().into_py_any(py),
+            "parent" => self.parent.as_deref().into_py_any(py),
+            "rank" => self.rank.as_str().into_py_any(py),
             _ => {
                 if self.extra.contains_key(key) {
                     Ok(json_value_to_pyobject(self.extra.get(key).unwrap()))
@@ -170,7 +171,7 @@ impl Taxonomy {
     ///
     /// Load a Taxonomy from a GTDB-encoded string.
     #[classmethod]
-    fn from_gtdb(_cls: &PyType, value: &str) -> PyResult<Taxonomy> {
+    fn from_gtdb(_cls: &Bound<'_, PyType>, value: &str) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
         let tax = py_try!(gtdb::load(&mut c));
         Ok(Taxonomy { tax })
@@ -184,7 +185,12 @@ impl Taxonomy {
     /// If `path` is specified, the JSON will be traversed to that sub-object
     /// before being parsed as a taxonomy. `path` has to be a valid JSON path string.
     #[classmethod]
-    fn from_json(_cls: &PyType, value: &str, json_pointer: Option<&str>) -> PyResult<Taxonomy> {
+    #[pyo3(signature = (value, json_pointer=None))]
+    fn from_json(
+        _cls: &Bound<'_, PyType>,
+        value: &str,
+        json_pointer: Option<&str>,
+    ) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
         let tax = py_try!(json::load(&mut c, json_pointer));
         Ok(Taxonomy { tax })
@@ -195,7 +201,7 @@ impl Taxonomy {
     ///
     /// Load a Taxonomy from a Newick-encoded string.
     #[classmethod]
-    fn from_newick(_cls: &PyType, value: &str) -> PyResult<Taxonomy> {
+    fn from_newick(_cls: &Bound<'_, PyType>, value: &str) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
         let tax = py_try!(newick::load(&mut c));
         Ok(Taxonomy { tax })
@@ -207,7 +213,7 @@ impl Taxonomy {
     /// Load a Taxonomy from a directory.
     /// The directory must contain the `nodes.dmp` and `names.dmp` files.
     #[classmethod]
-    fn from_ncbi(_cls: &PyType, dump_dir: &str) -> PyResult<Taxonomy> {
+    fn from_ncbi(_cls: &Bound<'_, PyType>, dump_dir: &str) -> PyResult<Taxonomy> {
         let tax = py_try!(ncbi::load(dump_dir));
         Ok(Taxonomy { tax })
     }
@@ -219,7 +225,7 @@ impl Taxonomy {
     ///
     /// Experimental.
     #[classmethod]
-    fn from_phyloxml(_cls: &PyType, value: &str) -> PyResult<Taxonomy> {
+    fn from_phyloxml(_cls: &Bound<'_, PyType>, value: &str) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
         let tax = py_try!(phyloxml::load(&mut c));
         Ok(Taxonomy { tax })
@@ -237,7 +243,7 @@ impl Taxonomy {
     /// --
     ///
     /// Export a Taxonomy as a JSON-encoded byte string in a tree format
-    fn to_json_tree(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn to_json_tree(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut bytes = Vec::new();
         py_try!(json::save::<_, &str, _>(
             &mut bytes,
@@ -245,14 +251,14 @@ impl Taxonomy {
             JsonFormat::Tree,
             None
         ));
-        Ok(PyBytes::new(py, &bytes).into())
+        Ok(PyBytes::new(py, &bytes).into_any().unbind())
     }
 
     /// to_json_node_links(self)
     /// --
     ///
     /// Export a Taxonomy as a JSON-encoded byte string in a node link format
-    fn to_json_node_links(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn to_json_node_links(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut bytes = Vec::new();
         py_try!(json::save::<_, &str, _>(
             &mut bytes,
@@ -260,7 +266,7 @@ impl Taxonomy {
             JsonFormat::NodeLink,
             None
         ));
-        Ok(PyBytes::new(py, &bytes).into())
+        Ok(PyBytes::new(py, &bytes).into_any().unbind())
     }
 
     /// to_ncbi(self, output_dir: str)
@@ -280,14 +286,14 @@ impl Taxonomy {
     /// --
     ///
     /// Export a Taxonomy as a Newick-encoded byte string.
-    fn to_newick(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn to_newick(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut bytes = Vec::new();
         py_try!(newick::save(
             &mut bytes,
             &self.tax,
             Some(TaxonomyTrait::<&str>::root(&self.tax))
         ));
-        Ok(PyBytes::new(py, &bytes).into())
+        Ok(PyBytes::new(py, &bytes).into_any().unbind())
     }
 
     /// node(self, tax_id: str) -> Optional[TaxonomyNode]
@@ -319,6 +325,7 @@ impl Taxonomy {
     ///
     /// If `at_rank` is provided, scan all the nodes in the node's lineage and return
     /// the parent id at that rank.
+    #[pyo3(signature = (tax_id, at_rank=None))]
     fn parent_with_distance(
         &self,
         tax_id: &str,
@@ -351,6 +358,7 @@ impl Taxonomy {
     ///
     /// If `at_rank` is provided, scan all the nodes in the node's lineage and return
     /// the parent id at that rank.
+    #[pyo3(signature = (tax_id, at_rank=None))]
     fn parent(&self, tax_id: &str, at_rank: Option<&str>) -> PyResult<Option<TaxonomyNode>> {
         let (node, _) = self.parent_with_distance(tax_id, at_rank)?;
         Ok(node)
@@ -428,12 +436,15 @@ impl Taxonomy {
     /// Return a copy of the taxonomy containing:
     ///  - only the nodes in `keep` and their parents if provided
     ///  - all of the nodes except those in remove and their children if provided
-    fn prune(&self, keep: Option<Vec<&str>>, remove: Option<Vec<&str>>) -> PyResult<Taxonomy> {
+    #[pyo3(signature = (keep=None, remove=None))]
+    fn prune(&self, keep: Option<Vec<String>>, remove: Option<Vec<String>>) -> PyResult<Taxonomy> {
         let mut tax = self.tax.clone();
         if let Some(k) = keep {
+            let k: Vec<&str> = k.iter().map(|s| s.as_str()).collect();
             tax = py_try!(prune_to(&tax, &k, false));
         }
         if let Some(r) = remove {
+            let r: Vec<&str> = r.iter().map(|s| s.as_str()).collect();
             tax = py_try!(prune_away(&tax, &r));
         }
         Ok(Taxonomy { tax })
@@ -468,6 +479,7 @@ impl Taxonomy {
     /// --
     ///
     /// Edit properties on a taxonomy node.
+    #[pyo3(signature = (tax_id, name=None, rank=None, parent_id=None, parent_distance=None))]
     fn edit_node(
         &mut self,
         tax_id: &str,
@@ -560,7 +572,7 @@ impl Taxonomy {
         let root = slf.tax.root();
         let root_idx = slf.tax.to_internal_index(root).unwrap();
         Ok(TaxonomyIterator {
-            t: slf.into_py(py),
+            t: slf.into_py_any(py)?,
             nodes_left: vec![root_idx],
             visited_nodes: Vec::new(),
         })
@@ -569,7 +581,7 @@ impl Taxonomy {
 
 #[pyclass]
 pub struct TaxonomyIterator {
-    t: PyObject,
+    t: Py<PyAny>,
     visited_nodes: Vec<usize>,
     nodes_left: Vec<usize>,
 }
@@ -629,10 +641,10 @@ impl TaxonomyIterator {
 
 /// The taxonomy module
 #[pymodule]
-fn taxonomy(py: Python, m: &PyModule) -> PyResult<()> {
+fn taxonomy(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Taxonomy>()?;
     m.add_class::<TaxonomyNode>()?;
-    m.add("TaxonomyError", py.get_type::<TaxonomyError>())?;
+    m.add("TaxonomyError", m.py().get_type::<TaxonomyError>())?;
 
     Ok(())
 }
