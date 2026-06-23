@@ -69,8 +69,10 @@ class TaxonomyNode:
 ```
 
 Note that tax_id in parameters passed in functions described below are string but for example in the case of NCBI need
-to be essentially quoting integers: `562 -> "562"`. 
+to be essentially quoting integers: `562 -> "562"`.
 If you loaded a taxonomy via JSON and you had additional data in your file, you can access it via indexing, `node["readcount"]` for example.
+
+`TaxonomyNode` is a **snapshot** — it reflects the tree state at the time it was fetched. Mutations via `set_data` do not update existing node references; re-fetch the node to see updated data.
 
 #### `tax.clone() -> Taxonomy`
 Return a new taxonomy, equivalent to a deep copy.
@@ -144,9 +146,76 @@ Remove the node from the tree, re-attaching parents as needed: only a single nod
 
 Add a new node to the tree at the parent provided.
 
-#### `edit_node(tax_id: str, /, name: str, rank: str, parent_id: str, parent_dist: float)`
+#### `tax.edit_node(tax_id: str, /, name: str, rank: str, parent_id: str, parent_dist: float)`
 
 Edit properties on a taxonomy node.
+
+### Storing and aggregating data on nodes
+
+#### `tax.set_data(node_id: str, key: str, value) -> None`
+
+Store an arbitrary value on a node. Mutates the taxonomy in-place.
+
+```python
+tax.set_data("562", "readcount", 42)
+tax["562"]["readcount"]  # 42
+```
+
+#### `node.get(key: str, default=None)`
+
+Safe read from a node's data with an optional fallback (mirrors `dict.get`).
+
+```python
+node.get("readcount")       # None if absent
+node.get("readcount", 0)    # 0 if absent
+```
+
+#### `node.data`
+
+Returns all data stored on a node as a Python `dict`.
+
+```python
+node.data  # e.g. {"readcount": 42}
+```
+
+#### `tax.reduce_up(node_id: str, output_key: str, fn) -> Taxonomy`
+
+Post-order (leaves → root) aggregation over the subtree rooted at `node_id`. The function `fn(node, child_results) -> result` is called once per node; results are stored under `output_key` and a **new Taxonomy** is returned (original unchanged).
+
+```python
+# Compute inclusive clade read counts
+annotated = tax.reduce_up("1", "clade_reads",
+    lambda node, child_results: node.get("readcount", 0) + sum(child_results))
+annotated["1224"]["clade_reads"]  # all reads in Proteobacteria
+
+# Count detected species per clade
+annotated = tax.reduce_up("1", "detected_species",
+    lambda node, child_results: sum(child_results)
+        + (1 if node.rank == "species" and node.get("readcount", 0) > 0 else 0))
+```
+
+#### `tax.map_down(node_id: str, output_key: str, initial, fn) -> Taxonomy`
+
+Pre-order (root → leaves) propagation over the subtree rooted at `node_id`. The function `fn(parent_result, node) -> result` is called once per node; the root receives `initial` as its parent result. Results are stored under `output_key` and a **new Taxonomy** is returned.
+
+```python
+# Build full lineage string for every node
+annotated = tax.map_down("1", "lineage", "",
+    lambda parent, node: f"{parent};{node.id}" if parent else node.id)
+
+# Compute depth of every node
+annotated = tax.map_down("1", "depth", 0,
+    lambda parent_depth, node: parent_depth + 1)
+```
+
+`reduce_up` and `map_down` are chainable — results stored by one call are visible to the next:
+
+```python
+annotated = tax.reduce_up("1", "clade_reads",
+    lambda node, child_results: node.get("readcount", 0) + sum(child_results))
+annotated = annotated.map_down("1", "relative_abundance", 1.0,
+    lambda _, node: node["clade_reads"] / annotated["1"]["clade_reads"])
+```
 
 #### `internal_index(tax_id: str)`
 

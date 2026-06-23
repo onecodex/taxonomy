@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Tuple, Iterator
+from typing import Any, Callable, List, Optional, Tuple, Iterator
 
 class TaxonomyError(Exception):
     """Raised when an error occurs in the taxonomy library."""
@@ -18,6 +18,9 @@ class TaxonomyNode:
     def __getitem__(self, key: str) -> Any: ...
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, other: object) -> bool: ...
+    def get(self, key: str, default: Any = None) -> Any: ...
+    @property
+    def data(self) -> dict: ...
 
 class Taxonomy:
     """
@@ -165,6 +168,40 @@ class Taxonomy:
         parent_distance: Optional[float] = None,
     ) -> None:
         """Edit properties on a taxonomy node."""
+        ...
+
+    def set_data(self, node_id: str, key: str, value: Any) -> None:
+        """Store an arbitrary value on a node. Mutates the taxonomy in-place."""
+        ...
+
+    def reduce_up(
+        self,
+        node_id: str,
+        output_key: str,
+        fn: Callable[[Any, List[Any]], Any],
+    ) -> "Taxonomy":
+        """
+        Post-order (leaves-to-root) aggregation over the subtree rooted at node_id.
+
+        fn(node, child_results) -> result is called for every node.
+        Results are stored under output_key and a new Taxonomy is returned.
+        """
+        ...
+
+    def map_down(
+        self,
+        node_id: str,
+        output_key: str,
+        initial: Any,
+        fn: Callable[[Any, Any], Any],
+    ) -> "Taxonomy":
+        """
+        Pre-order (root-to-leaves) propagation over the subtree rooted at node_id.
+
+        fn(parent_result, node) -> result is called for every node.
+        The root receives initial as parent_result.
+        Results are stored under output_key and a new Taxonomy is returned.
+        """
         ...
 
     def __repr__(self) -> str: ...
