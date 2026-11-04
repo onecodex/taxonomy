@@ -83,12 +83,9 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
     Ok(gt)
 }
 
-pub fn save<'t, T: 't, P: AsRef<Path>, X: Taxonomy<'t, T>>(
-    tax: &'t X,
-    out_dir: P,
-) -> TaxonomyResult<()>
+pub fn save<'t, T, P: AsRef<Path>, X: Taxonomy<'t, T>>(tax: &'t X, out_dir: P) -> TaxonomyResult<()>
 where
-    T: Clone + Debug + Display + PartialEq,
+    T: 't + Clone + Debug + Display + PartialEq,
 {
     let dir = out_dir.as_ref();
     std::fs::create_dir_all(dir)?;
