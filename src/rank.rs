@@ -111,160 +111,14 @@ pub enum TaxRank {
 }
 
 impl TaxRank {
-    /// Converts a TaxRank into a one of the rank strings NCBI uses.
-    /// Note that this doesn't handle ranks that are not used by the NCBI taxonomy.
+    /// Converts a TaxRank into the rank string NCBI uses (or, for ranks NCBI
+    /// doesn't define, our own lowercase spelling). Never coerces to "no rank".
     pub fn to_ncbi_rank(self) -> &'static str {
+        self.as_str()
+    }
+
+    pub fn as_str(self) -> &'static str {
         match self {
-            TaxRank::Superkingdom => "superkingdom",
-            TaxRank::AcellularRoot => "acellular root",
-            TaxRank::CellularRoot => "cellular root",
-            TaxRank::Kingdom => "kingdom",
-            TaxRank::Subkingdom => "subkingdom",
-            TaxRank::Superphylum => "superphylum",
-            TaxRank::Phylum => "phylum",
-            TaxRank::Subphylum => "subphylum",
-            TaxRank::Superclass => "superclass",
-            TaxRank::Class => "class",
-            TaxRank::Subclass => "subclass",
-            TaxRank::Infraclass => "infraclass",
-            TaxRank::Cohort => "cohort",
-            TaxRank::Subcohort => "subcohort",
-            TaxRank::Superorder => "superorder",
-            TaxRank::Order => "order",
-            TaxRank::Suborder => "suborder",
-            TaxRank::Infraorder => "infraorder",
-            TaxRank::Parvorder => "parvorder",
-            TaxRank::Superfamily => "superfamily",
-            TaxRank::Family => "family",
-            TaxRank::Subfamily => "subfamily",
-            TaxRank::Tribe => "tribe",
-            TaxRank::Subtribe => "subtribe",
-            TaxRank::Genus => "genus",
-            TaxRank::Series => "series",
-            TaxRank::Subgenus => "subgenus",
-            TaxRank::SpeciesGroup => "species group",
-            TaxRank::SpeciesSubgroup => "species subgroup",
-            TaxRank::Species => "species",
-            TaxRank::Subspecies => "subspecies",
-            TaxRank::Strain => "strain",
-            TaxRank::Synthetic => "synthetic",
-            TaxRank::Varietas => "varietas",
-            TaxRank::Forma => "forma",
-            TaxRank::Unspecified => "no rank",
-            TaxRank::Clade => "clade",
-            TaxRank::SeroGroup => "serogroup",
-            TaxRank::Biotype => "biotype",
-            TaxRank::FormaSpecialis => "forma specialis",
-            TaxRank::Isolate => "isolate",
-            TaxRank::Serotype => "serotype",
-            TaxRank::Genotype => "genotype",
-            TaxRank::Morph => "morph",
-            TaxRank::Pathogroup => "pathogroup",
-            // TODO: not sure if we want to manually coerce everything like this?
-            _ => "no rank",
-        }
-    }
-}
-
-impl FromStr for TaxRank {
-    type Err = Error;
-
-    fn from_str(s: &str) -> TaxonomyResult<Self> {
-        // many of these synonyms (and the ranks themselves) were pulled from:
-        // https://en.wikipedia.org/wiki/Taxonomic_rank
-        match s.trim().to_lowercase().as_ref() {
-            "domain" | "regio" => Ok(TaxRank::Domain),
-            "subdomain" => Ok(TaxRank::Subdomain),
-            "realm" => Ok(TaxRank::Realm),
-            "acellular root" => Ok(TaxRank::AcellularRoot),
-            "cellular root" => Ok(TaxRank::CellularRoot),
-            "subrealm" => Ok(TaxRank::Subrealm),
-            "hyperkingdom" | "hyperregnum" => Ok(TaxRank::Hyperkingdom),
-            "superkingdom" | "superregnum" => Ok(TaxRank::Superkingdom),
-            "kingdom" | "regnum" => Ok(TaxRank::Kingdom),
-            "subkingdom" | "subregnum" => Ok(TaxRank::Subkingdom),
-            "infrakingdom" | "infraregnum" => Ok(TaxRank::Infrakingdom),
-            "parvkingdom" | "parvregnum" => Ok(TaxRank::Parvkingdom),
-            "superphylum" | "superphyla" => Ok(TaxRank::Superphylum),
-            "phylum" | "phyla" => Ok(TaxRank::Phylum),
-            "subphylum" | "subphyla" => Ok(TaxRank::Subphylum),
-            "infraphylum" | "infraphyla" => Ok(TaxRank::Infraphylum),
-            "microphylum" | "microphyla" => Ok(TaxRank::Microphylum),
-            "superclass" => Ok(TaxRank::Superclass),
-            "class" | "classis" => Ok(TaxRank::Class),
-            "subclass" | "subclassis" => Ok(TaxRank::Subclass),
-            "infraclass" => Ok(TaxRank::Infraclass),
-            "parvclass" => Ok(TaxRank::Parvclass),
-            // note "division" may be either a TaxRank::Division (zoological)
-            // or synonym for TaxRank::Phylum (botanical) so we don't impl here
-            "superlegion" => Ok(TaxRank::Superlegion),
-            "legion" => Ok(TaxRank::Legion),
-            "sublegion" => Ok(TaxRank::Sublegion),
-            "infralegion" => Ok(TaxRank::Infralegion),
-            "supercohort" => Ok(TaxRank::Supercohort),
-            "cohort" => Ok(TaxRank::Cohort),
-            "subcohort" => Ok(TaxRank::Subcohort),
-            "infracohort" => Ok(TaxRank::Infracohort),
-            "superorder" => Ok(TaxRank::Superorder),
-            "gigaorder" => Ok(TaxRank::Gigaorder),
-            "magnorder" => Ok(TaxRank::Magnorder),
-            "grandorder" => Ok(TaxRank::Grandorder),
-            "mirorder" => Ok(TaxRank::Mirorder),
-            "order" | "ordo" => Ok(TaxRank::Order),
-            "nanorder" => Ok(TaxRank::Nanorder),
-            "hypoorder" => Ok(TaxRank::Hypoorder),
-            "minorder" => Ok(TaxRank::Minorder),
-            "suborder" | "subordo" => Ok(TaxRank::Suborder),
-            "infraorder" => Ok(TaxRank::Infraorder),
-            "parvorder" => Ok(TaxRank::Parvorder),
-            "section" | "sectio" => Ok(TaxRank::Section),
-            "subsection" => Ok(TaxRank::Subsection),
-            "gigafamily" => Ok(TaxRank::Gigafamily),
-            "megafamily" => Ok(TaxRank::Megafamily),
-            "grandfamily" => Ok(TaxRank::Grandfamily),
-            "hyperfamily" => Ok(TaxRank::Hyperfamily),
-            "superfamily" => Ok(TaxRank::Superfamily),
-            "epifamily" => Ok(TaxRank::Epifamily),
-            "family" | "familia" => Ok(TaxRank::Family),
-            "subfamily" => Ok(TaxRank::Subfamily),
-            "infrafamily" => Ok(TaxRank::Infrafamily),
-            "supertribe" => Ok(TaxRank::Supertribe),
-            "tribe" | "subtribus" => Ok(TaxRank::Tribe),
-            "subtribe" => Ok(TaxRank::Subtribe),
-            "infratribe" => Ok(TaxRank::Infratribe),
-            "genus" | "genera" => Ok(TaxRank::Genus),
-            "subgenus" => Ok(TaxRank::Subgenus),
-            "series" => Ok(TaxRank::Series),
-            "species group" => Ok(TaxRank::SpeciesGroup),
-            "species subgroup" => Ok(TaxRank::SpeciesSubgroup),
-            "species" => Ok(TaxRank::Species),
-            "subspecies" => Ok(TaxRank::Subspecies),
-            "synthetic" => Ok(TaxRank::Synthetic),
-            "variety" | "varietas" => Ok(TaxRank::Varietas),
-            "subvariety" | "subvarietas" => Ok(TaxRank::Subvarietas),
-            "form" | "forma" => Ok(TaxRank::Forma),
-            "subform" | "subforma" => Ok(TaxRank::Subforma),
-            "cultivar" => Ok(TaxRank::Cultivar),
-            "breed" => Ok(TaxRank::Breed),
-            "strain" => Ok(TaxRank::Strain),
-            "serogroup" => Ok(TaxRank::SeroGroup),
-            "no rank" | "no_rank" => Ok(TaxRank::Unspecified),
-            "biotype" => Ok(TaxRank::Biotype),
-            "clade" => Ok(TaxRank::Clade),
-            "forma specialis" => Ok(TaxRank::FormaSpecialis),
-            "isolate" => Ok(TaxRank::Isolate),
-            "serotype" => Ok(TaxRank::Serotype),
-            "genotype" => Ok(TaxRank::Genotype),
-            "morph" => Ok(TaxRank::Morph),
-            "pathogroup" => Ok(TaxRank::Pathogroup),
-            _ => Err(Error::new(ErrorKind::UnknownRank(s.to_string()))),
-        }
-    }
-}
-
-impl fmt::Display for TaxRank {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let rank_str = match self {
             TaxRank::Domain => "domain",
             TaxRank::AcellularRoot => "acellular root",
             TaxRank::CellularRoot => "cellular root",
@@ -356,8 +210,116 @@ impl fmt::Display for TaxRank {
             TaxRank::Morph => "morph",
             TaxRank::Pathogroup => "pathogroup",
             TaxRank::Synthetic => "synthetic",
-        };
-        write!(f, "{}", rank_str)
+        }
+    }
+}
+
+impl fmt::Display for TaxRank {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl FromStr for TaxRank {
+    type Err = Error;
+
+    fn from_str(s: &str) -> TaxonomyResult<Self> {
+        // many of these synonyms (and the ranks themselves) were pulled from:
+        // https://en.wikipedia.org/wiki/Taxonomic_rank
+        match s.trim().to_lowercase().as_ref() {
+            "domain" | "regio" => Ok(TaxRank::Domain),
+            "subdomain" => Ok(TaxRank::Subdomain),
+            "realm" => Ok(TaxRank::Realm),
+            "acellular root" => Ok(TaxRank::AcellularRoot),
+            "cellular root" => Ok(TaxRank::CellularRoot),
+            "subrealm" => Ok(TaxRank::Subrealm),
+            "hyperkingdom" | "hyperregnum" => Ok(TaxRank::Hyperkingdom),
+            "superkingdom" | "superregnum" => Ok(TaxRank::Superkingdom),
+            "kingdom" | "regnum" => Ok(TaxRank::Kingdom),
+            "subkingdom" | "subregnum" => Ok(TaxRank::Subkingdom),
+            "infrakingdom" | "infraregnum" => Ok(TaxRank::Infrakingdom),
+            "parvkingdom" | "parvregnum" => Ok(TaxRank::Parvkingdom),
+            "superphylum" | "superphyla" => Ok(TaxRank::Superphylum),
+            "phylum" | "phyla" => Ok(TaxRank::Phylum),
+            "subphylum" | "subphyla" => Ok(TaxRank::Subphylum),
+            "infraphylum" | "infraphyla" => Ok(TaxRank::Infraphylum),
+            "microphylum" | "microphyla" => Ok(TaxRank::Microphylum),
+            "superclass" => Ok(TaxRank::Superclass),
+            "class" | "classis" => Ok(TaxRank::Class),
+            "subclass" | "subclassis" => Ok(TaxRank::Subclass),
+            "infraclass" => Ok(TaxRank::Infraclass),
+            "parvclass" => Ok(TaxRank::Parvclass),
+            "superdivision" => Ok(TaxRank::Superdivision),
+            "division" => Ok(TaxRank::Division),
+            "subdivision" => Ok(TaxRank::Subdivision),
+            "infradivision" => Ok(TaxRank::Infradivision),
+            "superlegion" => Ok(TaxRank::Superlegion),
+            "legion" => Ok(TaxRank::Legion),
+            "sublegion" => Ok(TaxRank::Sublegion),
+            "infralegion" => Ok(TaxRank::Infralegion),
+            "supercohort" => Ok(TaxRank::Supercohort),
+            "cohort" => Ok(TaxRank::Cohort),
+            "subcohort" => Ok(TaxRank::Subcohort),
+            "infracohort" => Ok(TaxRank::Infracohort),
+            "superorder" => Ok(TaxRank::Superorder),
+            "gigaorder" => Ok(TaxRank::Gigaorder),
+            "magnorder" => Ok(TaxRank::Magnorder),
+            "grandorder" => Ok(TaxRank::Grandorder),
+            "mirorder" => Ok(TaxRank::Mirorder),
+            "series fish" => Ok(TaxRank::SeriesFish),
+            "order" | "ordo" => Ok(TaxRank::Order),
+            "nanorder" => Ok(TaxRank::Nanorder),
+            "hypoorder" => Ok(TaxRank::Hypoorder),
+            "minorder" => Ok(TaxRank::Minorder),
+            "suborder" | "subordo" => Ok(TaxRank::Suborder),
+            "infraorder" => Ok(TaxRank::Infraorder),
+            "parvorder" => Ok(TaxRank::Parvorder),
+            "section" | "sectio" => Ok(TaxRank::Section),
+            "subsection" => Ok(TaxRank::Subsection),
+            "gigafamily" => Ok(TaxRank::Gigafamily),
+            "megafamily" => Ok(TaxRank::Megafamily),
+            "grandfamily" => Ok(TaxRank::Grandfamily),
+            "hyperfamily" => Ok(TaxRank::Hyperfamily),
+            "superfamily" => Ok(TaxRank::Superfamily),
+            "epifamily" => Ok(TaxRank::Epifamily),
+            "series lepidoptera" => Ok(TaxRank::SeriesLepidoptera),
+            "group lepidoptera" => Ok(TaxRank::GroupLepidoptera),
+            "family" | "familia" => Ok(TaxRank::Family),
+            "subfamily" => Ok(TaxRank::Subfamily),
+            "infrafamily" => Ok(TaxRank::Infrafamily),
+            "supertribe" => Ok(TaxRank::Supertribe),
+            "tribe" | "subtribus" => Ok(TaxRank::Tribe),
+            "subtribe" => Ok(TaxRank::Subtribe),
+            "infratribe" => Ok(TaxRank::Infratribe),
+            "genus" | "genera" => Ok(TaxRank::Genus),
+            "subgenus" => Ok(TaxRank::Subgenus),
+            "series" => Ok(TaxRank::Series),
+            "subseries botany" => Ok(TaxRank::SubseriesBotany),
+            "species group" => Ok(TaxRank::SpeciesGroup),
+            "species subgroup" => Ok(TaxRank::SpeciesSubgroup),
+            "species" => Ok(TaxRank::Species),
+            "subspecies" => Ok(TaxRank::Subspecies),
+            "synthetic" => Ok(TaxRank::Synthetic),
+            "variety" | "varietas" => Ok(TaxRank::Varietas),
+            "subvariety" | "subvarietas" => Ok(TaxRank::Subvarietas),
+            "form" | "forma" => Ok(TaxRank::Forma),
+            "subform" | "subforma" => Ok(TaxRank::Subforma),
+            "cultivar" => Ok(TaxRank::Cultivar),
+            "breed" => Ok(TaxRank::Breed),
+            "strain" => Ok(TaxRank::Strain),
+            "individual" => Ok(TaxRank::Individual),
+            "serogroup" => Ok(TaxRank::SeroGroup),
+            "no rank" | "no_rank" => Ok(TaxRank::Unspecified),
+            "biotype" => Ok(TaxRank::Biotype),
+            "clade" => Ok(TaxRank::Clade),
+            "forma specialis" => Ok(TaxRank::FormaSpecialis),
+            "isolate" => Ok(TaxRank::Isolate),
+            "serotype" => Ok(TaxRank::Serotype),
+            "genotype" => Ok(TaxRank::Genotype),
+            "morph" => Ok(TaxRank::Morph),
+            "pathogroup" => Ok(TaxRank::Pathogroup),
+            _ => Err(Error::new(ErrorKind::UnknownRank(s.to_string()))),
+        }
     }
 }
 
@@ -461,7 +423,7 @@ mod test {
     #[test]
     fn test_str_to_rank() {
         for rank in RANKS.iter() {
-            assert!(TaxRank::from_str(rank.to_ncbi_rank()).is_ok());
+            assert_eq!(TaxRank::from_str(rank.to_ncbi_rank()).unwrap(), *rank);
         }
         assert!(TaxRank::from_str("fake_data").is_err());
     }
@@ -471,11 +433,11 @@ mod test {
         for rank in RANKS.iter() {
             let rank_str = rank.to_string();
             assert!(!rank_str.is_empty());
-
-            let ncbi_str = rank.to_ncbi_rank();
-            if ncbi_str != "no rank" {
-                assert_eq!(ncbi_str, rank_str);
+            assert_eq!(rank.to_ncbi_rank(), rank_str);
+            if *rank != Unspecified {
+                assert_ne!(rank_str, "no rank");
             }
         }
+        assert_eq!(Domain.to_ncbi_rank(), "domain");
     }
 }

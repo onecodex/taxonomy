@@ -83,12 +83,9 @@ pub fn load<P: AsRef<Path>>(ncbi_directory: P) -> TaxonomyResult<GeneralTaxonomy
     Ok(gt)
 }
 
-pub fn save<'t, T: 't, P: AsRef<Path>, X: Taxonomy<'t, T>>(
-    tax: &'t X,
-    out_dir: P,
-) -> TaxonomyResult<()>
+pub fn save<'t, T, P: AsRef<Path>, X: Taxonomy<'t, T>>(tax: &'t X, out_dir: P) -> TaxonomyResult<()>
 where
-    T: Clone + Debug + Display + PartialEq,
+    T: 't + Clone + Debug + Display + PartialEq,
 {
     let dir = out_dir.as_ref();
     std::fs::create_dir_all(dir)?;
@@ -134,7 +131,7 @@ mod tests {
         let nodes =
             "1\t|\t1\t|\tno rank\t|\t\t|\t8\t|\t0\t|\t1\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|
     10239\t|\t1\t|\tno_rank\t|\t\t|\t9\t|\t0\t|\t1\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|
-    2\t|\t131567\t|\tsuperkingdom\t|\t\t|\t0\t|\t0\t|\t11\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|
+    2\t|\t131567\t|\tdomain\t|\t\t|\t0\t|\t0\t|\t11\t|\t0\t|\t0\t|\t0\t|\t0\t|\t0\t|\t\t|
     543\t|\t91347\t|\tfamily\t|\t\t|\t0\t|\t1\t|\t11\t|\t1\t|\t0\t|\t1\t|\t0\t|\t0\t|\t\t|
     561\t|\t543\t|\tgenus\t|\t\t|\t0\t|\t1\t|\t11\t|\t1\t|\t0\t|\t1\t|\t0\t|\t0\t|\t\t|
     562\t|\t561\t|\tspecies\t|\tEC\t|\t0\t|\t1\t|\t11\t|\t1\t|\t0\t|\t1\t|\t1\t|\t0\t|\t\t|
@@ -238,6 +235,9 @@ mod tests {
             Taxonomy::<&str>::parent(&tax2, "562").unwrap(),
             Some(("561", 1.))
         );
+
+        // Check Bacteria (2) keeps its "domain" rank through save/load
+        assert_eq!(Taxonomy::<&str>::rank(&tax2, "2").unwrap(), TaxRank::Domain);
 
         // Check Escherichia (561)
         assert_eq!(Taxonomy::<&str>::name(&tax2, "561").unwrap(), "Escherichia");
