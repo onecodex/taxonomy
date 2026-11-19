@@ -216,6 +216,56 @@ def test_json_to_json_node_links_empty_tree(json_tax):
     assert actual == expected
 
 
+@pytest.mark.parametrize("to_json", ["to_json_tree", "to_json_node_links"])
+def test_from_dict_matches_from_json(json_tax: Taxonomy, to_json: str):
+    serialized = getattr(json_tax, to_json)().decode()
+    from_dict = Taxonomy.from_dict(json.loads(serialized))
+    from_json = Taxonomy.from_json(serialized)
+    assert list(from_dict) == list(from_json)
+    for tax_id in from_json:
+        assert from_dict[tax_id] == from_json[tax_id]
+        assert from_dict[tax_id].parent == from_json[tax_id].parent
+        assert from_dict[tax_id].rank == from_json[tax_id].rank
+
+
+def test_from_dict_integer_ids_and_extra_data():
+    tax = Taxonomy.from_dict(
+        {
+            "id": 1,
+            "name": "root",
+            "rank": "no rank",
+            "readcount": 5,
+            "children": [{"id": 2, "name": "child", "rank": "species", "abundance": 0.5}],
+        }
+    )
+    assert tax["2"].parent == "1"
+    assert tax["1"]["readcount"] == 5
+    assert tax["2"]["abundance"] == 0.5
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"id": "1", "name": "root", "children": [{"id": "1", "name": "dup"}]},
+        {"name": "no id"},
+        {"id": -1, "name": "root"},
+        {"id": "1", "name": "root", "rank": "not a rank"},
+        {"nodes": None, "links": []},
+        {"nodes": [{"id": "1", "name": "root"}]},
+        {"nodes": [{"id": "abc", "name": "root"}, {"id": "2"}], "links": []},
+        {"nodes": [{"id": "abc", "name": "root"}]},
+        {"nodes": [{"id": "1", "name": "root"}], "links": [{"source": 0}]},
+        {"nodes": [{"id": "1", "name": "root"}], "links": [{"source": 5, "target": 0}]},
+    ],
+)
+def test_from_dict_errors_match_from_json(value):
+    with pytest.raises(TaxonomyError) as from_json_err:
+        Taxonomy.from_json(json.dumps(value))
+    with pytest.raises(TaxonomyError) as from_dict_err:
+        Taxonomy.from_dict(value)
+    assert str(from_dict_err.value) == str(from_json_err.value)
+
+
 def test_newick_root(newick_tax: Taxonomy):
     root = newick_tax.root
     assert root.id == "F"

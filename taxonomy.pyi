@@ -42,6 +42,48 @@ class Taxonomy:
         ...
 
     @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> "Taxonomy":
+        """
+        Load a Taxonomy from an already-parsed JSON object, without serializing
+        it to a string first. The format can either be of the tree or
+        node_link_data types and will be automatically detected.
+
+        Tree format:
+
+        >>> tax = Taxonomy.from_dict(
+        ...     {
+        ...         "id": "1",
+        ...         "name": "root",
+        ...         "rank": "no rank",
+        ...         "children": [
+        ...             {"id": "562", "name": "Escherichia coli", "rank": "species"}
+        ...         ],
+        ...     }
+        ... )
+        >>> tax.parent("562").name
+        'root'
+
+        Node-link format, where links point from a child's index in `nodes` to
+        its parent's:
+
+        >>> tax = Taxonomy.from_dict(
+        ...     {
+        ...         "nodes": [
+        ...             {"id": "1", "name": "root", "rank": "no rank"},
+        ...             {"id": "562", "name": "Escherichia coli", "rank": "species"},
+        ...         ],
+        ...         "links": [{"source": 1, "target": 0}],
+        ...     }
+        ... )
+        >>> tax.parent("562").name
+        'root'
+
+        To load a sub-object, index into it first, e.g.
+        `Taxonomy.from_dict(response["data"]["taxonomy"])`.
+        """
+        ...
+
+    @classmethod
     def from_newick(cls, value: str) -> "Taxonomy":
         """Load a Taxonomy from a Newick-encoded string."""
         ...
