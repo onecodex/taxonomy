@@ -173,16 +173,13 @@ struct Link {
 }
 
 /// Requires `nodes` to be an array of object with at least {rank, name, id}
-fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
-    let json_tax_nodes = tax_json["nodes"]
-        .as_array()
-        .ok_or_else(|| {
-            Error::new(ErrorKind::ImportError {
-                line: 0,
-                msg: "'nodes' not in JSON".to_owned(),
-            })
-        })?
-        .clone();
+fn load_node_link_json(mut tax_json: Value) -> TaxonomyResult<GeneralTaxonomy> {
+    let Value::Array(json_tax_nodes) = tax_json["nodes"].take() else {
+        return Err(Error::new(ErrorKind::ImportError {
+            line: 0,
+            msg: "'nodes' not in JSON".to_owned(),
+        }));
+    };
 
     let mut tax_nodes = Vec::with_capacity(json_tax_nodes.len());
     for n in json_tax_nodes {
@@ -196,15 +193,12 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
         tax_nodes.push(node);
     }
 
-    let tax_links = tax_json["links"]
-        .as_array()
-        .ok_or_else(|| {
-            Error::new(ErrorKind::ImportError {
-                line: 0,
-                msg: "'links' not in JSON".to_owned(),
-            })
-        })?
-        .clone();
+    let Value::Array(tax_links) = tax_json["links"].take() else {
+        return Err(Error::new(ErrorKind::ImportError {
+            line: 0,
+            msg: "'links' not in JSON".to_owned(),
+        }));
+    };
 
     let num_nodes = tax_nodes.len();
     let mut tax_ids: Vec<String> = Vec::with_capacity(tax_nodes.len());
@@ -270,8 +264,8 @@ struct TaxNodeTree {
     extra: HashMap<String, Value>,
 }
 
-fn load_tree_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
-    let root_node: TaxNodeTree = serde_json::from_value(tax_json.clone())?;
+fn load_tree_json(tax_json: Value) -> TaxonomyResult<GeneralTaxonomy> {
+    let root_node: TaxNodeTree = serde_json::from_value(tax_json)?;
 
     fn add_node(
         parent_loc: usize,
@@ -322,16 +316,19 @@ fn load_tree_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
 }
 
 pub fn load<R: Read>(reader: R, json_pointer: Option<&str>) -> TaxonomyResult<GeneralTaxonomy> {
-    let tax_json: Value = serde_json::from_reader(reader)?;
+    let mut tax_json: Value = serde_json::from_reader(reader)?;
     let actual_tax_json = if let Some(p) = json_pointer {
-        tax_json.pointer(p).ok_or_else(|| {
-            Error::new(ErrorKind::ImportError {
-                line: 0,
-                msg: format!("JSON path {} does not correspond to a value", p),
-            })
-        })?
+        tax_json
+            .pointer_mut(p)
+            .ok_or_else(|| {
+                Error::new(ErrorKind::ImportError {
+                    line: 0,
+                    msg: format!("JSON path {} does not correspond to a value", p),
+                })
+            })?
+            .take()
     } else {
-        &tax_json
+        tax_json
     };
 
     // determine the JSON type
@@ -502,7 +499,7 @@ mod tests {
         // Converting to Value should give us the same data
         let serialized = serialize_as_node_links(&tax, Some(Taxonomy::<&str>::root(&tax))).unwrap();
 
-        let tax2 = load_node_link_json(&serialized).unwrap();
+        let tax2 = load_node_link_json(serialized).unwrap();
         assert_eq!(Taxonomy::<&str>::len(&tax2), 3);
         assert_eq!(Taxonomy::<&str>::root(&tax2), "1");
         assert_eq!(Taxonomy::<&str>::children(&tax2, "1").unwrap(), vec!["2"]);
