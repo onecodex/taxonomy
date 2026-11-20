@@ -266,6 +266,22 @@ def test_from_dict_errors_match_from_json(value):
     assert str(from_dict_err.value) == str(from_json_err.value)
 
 
+@pytest.mark.parametrize(
+    "value,message",
+    [
+        ({"nodes": 5, "links": []}, "'nodes' must be an array"),
+        ({"nodes": None, "links": []}, "'nodes' must be an array"),
+        ({"nodes": []}, "'links' not in JSON"),
+        ({"nodes": [], "links": 5}, "'links' must be an array"),
+    ],
+)
+@pytest.mark.parametrize("load", ["from_json", "from_dict"])
+def test_node_link_array_errors(value, message, load):
+    arg = json.dumps(value) if load == "from_json" else value
+    with pytest.raises(TaxonomyError, match=message):
+        getattr(Taxonomy, load)(arg)
+
+
 def test_newick_root(newick_tax: Taxonomy):
     root = newick_tax.root
     assert root.id == "F"

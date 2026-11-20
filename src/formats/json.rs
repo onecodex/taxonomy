@@ -209,7 +209,7 @@ fn load_node_link_json<D: JsonDocument>(
     let Some(json_tax_nodes) = nodes.into_array() else {
         return Err(Error::new(ErrorKind::ImportError {
             line: 0,
-            msg: "'nodes' not in JSON".to_owned(),
+            msg: "'nodes' must be an array".to_owned(),
         }));
     };
 
@@ -225,10 +225,16 @@ fn load_node_link_json<D: JsonDocument>(
         tax_nodes.push(node);
     }
 
-    let Some(tax_links) = links.and_then(D::into_array) else {
+    let Some(links) = links else {
         return Err(Error::new(ErrorKind::ImportError {
             line: 0,
             msg: "'links' not in JSON".to_owned(),
+        }));
+    };
+    let Some(tax_links) = links.into_array() else {
+        return Err(Error::new(ErrorKind::ImportError {
+            line: 0,
+            msg: "'links' must be an array".to_owned(),
         }));
     };
 
