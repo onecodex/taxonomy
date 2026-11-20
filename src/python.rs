@@ -11,10 +11,13 @@ use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList, PyType};
 use pyo3::IntoPyObjectExt;
+use pythonize::depythonize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::base::InternalIndex;
-use crate::json::JsonFormat;
+use crate::errors::{Error, ErrorKind, TaxonomyResult};
+use crate::json::{JsonDocument, JsonFormat};
 use crate::rank::TaxRank;
 use crate::Taxonomy as TaxonomyTrait;
 use crate::{gtdb, json, ncbi, newick, phyloxml, prune_away, prune_to, GeneralTaxonomy};
@@ -29,6 +32,30 @@ macro_rules! py_try {
     ($call:expr, $msg:expr) => {
         $call.map_err(|_| PyErr::new::<TaxonomyError, _>($msg.to_owned()))?
     };
+}
+
+fn import_error(e: impl std::fmt::Display) -> Error {
+    Error::new(ErrorKind::ImportError {
+        line: 0,
+        msg: e.to_string(),
+    })
+}
+
+impl JsonDocument for Bound<'_, PyAny> {
+    fn take_key(&mut self, key: &str) -> TaxonomyResult<Option<Self>> {
+        match self.cast::<PyDict>() {
+            Ok(dict) => dict.get_item(key).map_err(import_error),
+            Err(_) => Ok(None),
+        }
+    }
+
+    fn into_array(self) -> Option<Vec<Self>> {
+        self.cast::<PyList>().ok().map(|list| list.iter().collect())
+    }
+
+    fn deserialize<T: DeserializeOwned>(self) -> TaxonomyResult<T> {
+        depythonize(&self).map_err(import_error)
+    }
 }
 
 fn json_value_to_pyobject(val: &Value) -> Py<PyAny> {
@@ -193,6 +220,17 @@ impl Taxonomy {
     ) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
         let tax = py_try!(json::load(&mut c, json_pointer));
+        Ok(Taxonomy { tax })
+    }
+
+    /// from_dict(cls, value: dict)
+    /// --
+    ///
+    /// Load a Taxonomy from an already-parsed JSON object (a `dict` in the tree or node-link
+    /// format), without serializing it to a JSON string first.
+    #[classmethod]
+    fn from_dict(_cls: &Bound<'_, PyType>, value: &Bound<'_, PyDict>) -> PyResult<Taxonomy> {
+        let tax = py_try!(json::load_document(value.as_any().clone()));
         Ok(Taxonomy { tax })
     }
 
