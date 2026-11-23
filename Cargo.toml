@@ -13,13 +13,14 @@ edition = "2021"
 [dependencies]
 memchr = "2.2.1"
 pyo3 = { version = "0.29", optional = true }
+pythonize = { version = "0.29", optional = true }
 quick-xml = "0.27"
 serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"
 
 [features]
-python = ["pyo3/extension-module"]
-python_test = ["pyo3", "pyo3/auto-initialize"]
+python = ["pyo3/extension-module", "pythonize"]
+python_test = ["pyo3", "pyo3/auto-initialize", "pythonize"]
 
 [lib]
 crate-type=["cdylib", "rlib"]

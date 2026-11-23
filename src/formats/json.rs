@@ -9,6 +9,7 @@ use crate::base::GeneralTaxonomy;
 use crate::errors::{Error, ErrorKind, TaxonomyResult};
 use crate::rank::TaxRank;
 use crate::Taxonomy;
+use serde::de::DeserializeOwned;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, to_value, to_writer, Value};
 
@@ -172,21 +173,49 @@ struct Link {
     target: usize,
 }
 
+/// A parsed JSON document that a taxonomy can be loaded from, so that already-parsed data
+/// (e.g. a Python object) doesn't need to be serialized to a string first.
+pub(crate) trait JsonDocument: Sized {
+    /// Returns the value under `key` if this is an object containing it, moving it out of
+    /// `self` where possible.
+    fn take_key(&mut self, key: &str) -> TaxonomyResult<Option<Self>>;
+    /// Returns the elements if this is an array.
+    fn into_array(self) -> Option<Vec<Self>>;
+    fn deserialize<T: DeserializeOwned>(self) -> TaxonomyResult<T>;
+}
+
+impl JsonDocument for Value {
+    fn take_key(&mut self, key: &str) -> TaxonomyResult<Option<Self>> {
+        Ok(self.get_mut(key).map(Value::take))
+    }
+
+    fn into_array(self) -> Option<Vec<Self>> {
+        match self {
+            Value::Array(arr) => Some(arr),
+            _ => None,
+        }
+    }
+
+    fn deserialize<T: DeserializeOwned>(self) -> TaxonomyResult<T> {
+        Ok(serde_json::from_value(self)?)
+    }
+}
+
 /// Requires `nodes` to be an array of object with at least {rank, name, id}
-fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
-    let json_tax_nodes = tax_json["nodes"]
-        .as_array()
-        .ok_or_else(|| {
-            Error::new(ErrorKind::ImportError {
-                line: 0,
-                msg: "'nodes' not in JSON".to_owned(),
-            })
-        })?
-        .clone();
+fn load_node_link_json<D: JsonDocument>(
+    nodes: D,
+    links: Option<D>,
+) -> TaxonomyResult<GeneralTaxonomy> {
+    let Some(json_tax_nodes) = nodes.into_array() else {
+        return Err(Error::new(ErrorKind::ImportError {
+            line: 0,
+            msg: "'nodes' must be an array".to_owned(),
+        }));
+    };
 
     let mut tax_nodes = Vec::with_capacity(json_tax_nodes.len());
     for n in json_tax_nodes {
-        let node: TaxNode = serde_json::from_value(n)?;
+        let node: TaxNode = n.deserialize()?;
         if node.id.parse::<usize>().is_err() {
             return Err(Error::new(ErrorKind::ImportError {
                 line: 0,
@@ -196,15 +225,18 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
         tax_nodes.push(node);
     }
 
-    let tax_links = tax_json["links"]
-        .as_array()
-        .ok_or_else(|| {
-            Error::new(ErrorKind::ImportError {
-                line: 0,
-                msg: "'links' not in JSON".to_owned(),
-            })
-        })?
-        .clone();
+    let Some(links) = links else {
+        return Err(Error::new(ErrorKind::ImportError {
+            line: 0,
+            msg: "'links' not in JSON".to_owned(),
+        }));
+    };
+    let Some(tax_links) = links.into_array() else {
+        return Err(Error::new(ErrorKind::ImportError {
+            line: 0,
+            msg: "'links' must be an array".to_owned(),
+        }));
+    };
 
     let num_nodes = tax_nodes.len();
     let mut tax_ids: Vec<String> = Vec::with_capacity(tax_nodes.len());
@@ -221,7 +253,7 @@ fn load_node_link_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
     }
 
     for l in tax_links {
-        let link: Link = serde_json::from_value(l)?;
+        let link: Link = l.deserialize()?;
         if link.source >= num_nodes {
             return Err(Error::new(ErrorKind::ImportError {
                 line: 0,
@@ -270,8 +302,8 @@ struct TaxNodeTree {
     extra: HashMap<String, Value>,
 }
 
-fn load_tree_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
-    let root_node: TaxNodeTree = serde_json::from_value(tax_json.clone())?;
+fn load_tree_json<D: JsonDocument>(tax_json: D) -> TaxonomyResult<GeneralTaxonomy> {
+    let root_node: TaxNodeTree = tax_json.deserialize()?;
 
     fn add_node(
         parent_loc: usize,
@@ -322,23 +354,31 @@ fn load_tree_json(tax_json: &Value) -> TaxonomyResult<GeneralTaxonomy> {
 }
 
 pub fn load<R: Read>(reader: R, json_pointer: Option<&str>) -> TaxonomyResult<GeneralTaxonomy> {
-    let tax_json: Value = serde_json::from_reader(reader)?;
+    let mut tax_json: Value = serde_json::from_reader(reader)?;
     let actual_tax_json = if let Some(p) = json_pointer {
-        tax_json.pointer(p).ok_or_else(|| {
-            Error::new(ErrorKind::ImportError {
-                line: 0,
-                msg: format!("JSON path {} does not correspond to a value", p),
-            })
-        })?
+        tax_json
+            .pointer_mut(p)
+            .ok_or_else(|| {
+                Error::new(ErrorKind::ImportError {
+                    line: 0,
+                    msg: format!("JSON path {} does not correspond to a value", p),
+                })
+            })?
+            .take()
     } else {
-        &tax_json
+        tax_json
     };
+    load_document(actual_tax_json)
+}
 
+pub(crate) fn load_document<D: JsonDocument>(mut tax_json: D) -> TaxonomyResult<GeneralTaxonomy> {
     // determine the JSON type
-    let gt = if actual_tax_json.get("nodes").is_some() {
-        load_node_link_json(actual_tax_json)
-    } else {
-        load_tree_json(actual_tax_json)
+    let gt = match tax_json.take_key("nodes")? {
+        Some(nodes) => {
+            let links = tax_json.take_key("links")?;
+            load_node_link_json(nodes, links)
+        }
+        None => load_tree_json(tax_json),
     }?;
     gt.validate_uniqueness()?;
     Ok(gt)
@@ -502,7 +542,7 @@ mod tests {
         // Converting to Value should give us the same data
         let serialized = serialize_as_node_links(&tax, Some(Taxonomy::<&str>::root(&tax))).unwrap();
 
-        let tax2 = load_node_link_json(&serialized).unwrap();
+        let tax2 = load_document(serialized).unwrap();
         assert_eq!(Taxonomy::<&str>::len(&tax2), 3);
         assert_eq!(Taxonomy::<&str>::root(&tax2), "1");
         assert_eq!(Taxonomy::<&str>::children(&tax2, "1").unwrap(), vec!["2"]);
