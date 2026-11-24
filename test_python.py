@@ -477,12 +477,36 @@ def test_ncbi_descendants_unknown_id(ncbi_tax: Taxonomy):
         ncbi_tax.descendants("unknown")
 
 
+def test_ncbi_descendant_ids(ncbi_tax: Taxonomy):
+    descendant_ids = ncbi_tax.descendant_ids("543")
+    assert descendant_ids == [n.id for n in ncbi_tax.descendants("543")]
+    assert "562" in descendant_ids
+    assert "543" not in descendant_ids
+
+
+def test_ncbi_descendant_ids_unknown_id(ncbi_tax: Taxonomy):
+    with pytest.raises(TaxonomyError):
+        ncbi_tax.descendant_ids("unknown")
+
+
 def test_ncbi_lineage(ncbi_tax: Taxonomy):
     lineage = ncbi_tax.lineage("562")
     assert len(lineage) == 9
     assert lineage[0].id == "562"
     assert lineage[1].id == "561"
     assert lineage[-1].id == "1"
+
+
+def test_ncbi_lineage_ids(ncbi_tax: Taxonomy):
+    lineage_ids = ncbi_tax.lineage_ids("562")
+    assert lineage_ids == [n.id for n in ncbi_tax.lineage("562")]
+    assert lineage_ids[0] == "562"
+    assert lineage_ids[-1] == "1"
+
+
+def test_ncbi_lineage_ids_unknown_id(ncbi_tax: Taxonomy):
+    with pytest.raises(TaxonomyError):
+        ncbi_tax.lineage_ids("unknown")
 
 
 def test_ncbi_parents(ncbi_tax: Taxonomy):

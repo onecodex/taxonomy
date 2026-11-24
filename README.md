@@ -117,9 +117,17 @@ Returns all direct nodes below the given tax id.
 Returns all nodes below the given tax id. 
 Equivalent to running `tax.children` recursively on the initial result of `tax.children(tax_id)`.
 
+#### `tax.descendant_ids(tax_id: str) -> List[str]`
+
+Same as `descendants` but returns only the tax ids. Faster on large trees since no `TaxonomyNode` objects are built.
+
 #### `tax.lineage(tax_id: str) -> List[TaxonomyNode]`
 
 Returns all nodes above the given tax id, including itself.
+
+#### `tax.lineage_ids(tax_id: str) -> List[str]`
+
+Same as `lineage` but returns only the tax ids. Faster on large trees since no `TaxonomyNode` objects are built.
 
 #### `tax.parents(tax_id: str) -> List[TaxonomyNode]`
 

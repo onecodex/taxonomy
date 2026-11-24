@@ -439,6 +439,20 @@ impl Taxonomy {
         Ok(res)
     }
 
+    /// descendant_ids(self, tax_id: str)
+    /// --
+    ///
+    /// Return a list of the IDs of all taxonomy nodes below the node id provided, not
+    /// including that node itself. Sorted by tax ID as a string (so "10" comes before "2").
+    fn descendant_ids(&self, tax_id: &str) -> PyResult<Vec<String>> {
+        let res = self
+            .descendant_indices(tax_id)?
+            .into_iter()
+            .map(|idx| self.tax.tax_ids[idx].clone())
+            .collect();
+        Ok(res)
+    }
+
     /// lineage(self, tax_id: str)
     /// --
     ///
@@ -450,6 +464,20 @@ impl Taxonomy {
             .into_iter()
             .map(|idx| self.as_node_at(idx))
             .collect::<PyResult<Vec<TaxonomyNode>>>()?;
+        Ok(res)
+    }
+
+    /// lineage_ids(self, tax_id: str)
+    /// --
+    ///
+    /// Return a list of the IDs of the node id provided and all of its parent taxonomy nodes,
+    /// ordered from that node (first) up to the root (last).
+    fn lineage_ids(&self, tax_id: &str) -> PyResult<Vec<String>> {
+        let res = self
+            .lineage_indices(tax_id)?
+            .into_iter()
+            .map(|idx| self.tax.tax_ids[idx].clone())
+            .collect();
         Ok(res)
     }
 
