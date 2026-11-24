@@ -194,12 +194,9 @@ impl Taxonomy {
         Ok(py_try!(self.tax.lineage(idx)))
     }
 
-    /// Sorted by tax ID, matching the order of the `&str` implementation.
     fn descendant_indices(&self, tax_id: &str) -> PyResult<Vec<InternalIndex>> {
         let idx = py_try!(self.tax.to_internal_index(tax_id));
-        let mut res = py_try!(self.tax.descendants(idx));
-        res.sort_unstable_by_key(|&i| &self.tax.tax_ids[i]);
-        Ok(res)
+        Ok(py_try!(self.tax.descendants(idx)))
     }
 }
 
@@ -430,7 +427,7 @@ impl Taxonomy {
     /// --
     ///
     /// Return a list of all taxonomy nodes below the node id provided, not including that
-    /// node itself. Sorted by tax ID as a string (so "10" comes before "2").
+    /// node itself, in depth-first order: each node comes before all of its own descendants.
     fn descendants(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
         let res = self
             .descendant_indices(tax_id)?
@@ -444,7 +441,8 @@ impl Taxonomy {
     /// --
     ///
     /// Return a list of the IDs of all taxonomy nodes below the node id provided, not
-    /// including that node itself. Sorted by tax ID as a string (so "10" comes before "2").
+    /// including that node itself, in depth-first order: each node comes before all of its own
+    /// descendants.
     fn descendant_ids(&self, tax_id: &str) -> PyResult<Vec<String>> {
         let res = self
             .descendant_indices(tax_id)?

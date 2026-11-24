@@ -484,6 +484,13 @@ def test_ncbi_descendant_ids(ncbi_tax: Taxonomy):
     assert "543" not in descendant_ids
 
 
+def test_ncbi_descendants_are_depth_first(ncbi_tax: Taxonomy):
+    seen = {"543"}
+    for node in ncbi_tax.descendants("543"):
+        assert node.parent in seen
+        seen.add(node.id)
+
+
 def test_ncbi_descendant_ids_unknown_id(ncbi_tax: Taxonomy):
     with pytest.raises(TaxonomyError):
         ncbi_tax.descendant_ids("unknown")

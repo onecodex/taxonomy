@@ -157,16 +157,16 @@ class Taxonomy:
     def descendants(self, tax_id: str) -> List[TaxonomyNode]:
         """
         Return a list of all taxonomy nodes below the node id provided, not
-        including that node itself. Sorted by tax ID as a string (so "10"
-        comes before "2").
+        including that node itself, in depth-first order: each node comes
+        before all of its own descendants.
         """
         ...
 
     def descendant_ids(self, tax_id: str) -> List[str]:
         """
         Return a list of the IDs of all taxonomy nodes below the node id
-        provided, not including that node itself. Sorted by tax ID as a string
-        (so "10" comes before "2"). Equivalent to
+        provided, not including that node itself, in depth-first order: each
+        node comes before all of its own descendants. Equivalent to
         `[n.id for n in tax.descendants(tax_id)]`, but faster since no
         `TaxonomyNode` objects are built.
         """

@@ -391,13 +391,14 @@ impl<'t> Taxonomy<'t, InternalIndex> for GeneralTaxonomy {
         }
     }
 
+    /// Returns descendants in depth-first order: each node comes before all of its own
+    /// descendants.
     fn descendants(&'t self, tax_id: InternalIndex) -> TaxonomyResult<Vec<InternalIndex>> {
-        let children: HashSet<InternalIndex> = self
+        Ok(self
             .traverse(tax_id)?
+            .filter(|(n, preorder)| *preorder && *n != tax_id)
             .map(|(n, _)| n)
-            .filter(|n| *n != tax_id)
-            .collect();
-        Ok(children.into_iter().collect())
+            .collect())
     }
 
     fn parent(&'t self, idx: InternalIndex) -> TaxonomyResult<Option<(InternalIndex, f32)>> {
@@ -498,6 +499,20 @@ mod tests {
         assert!(!tax.contains("unknown"));
         assert!(Taxonomy::<InternalIndex>::contains(&tax, 5));
         assert!(!Taxonomy::<InternalIndex>::contains(&tax, 6));
+    }
+
+    #[test]
+    fn internal_index_descendants_are_depth_first() {
+        let tax = create_test_taxonomy();
+        let descendants = Taxonomy::<InternalIndex>::descendants(&tax, 0).unwrap();
+        assert_eq!(descendants.len(), 5);
+        for (i, &idx) in descendants.iter().enumerate() {
+            let parent = Taxonomy::<InternalIndex>::parent(&tax, idx)
+                .unwrap()
+                .unwrap()
+                .0;
+            assert!(parent == 0 || descendants[..i].contains(&parent));
+        }
     }
 
     #[test]
