@@ -43,9 +43,11 @@ Taxonomy can be loaded from a variety of sources.
 3. `Taxonomy.from_json(value: str, /, json_pointer: str)`: loads a Taxonomy from a JSON-encoded string. The format can either be
 of the tree or node_link_data types and will be automatically detected (more details on both formats on [the documentation](https://docs.rs/taxonomy/latest/taxonomy/json/enum.JsonFormat.html). If `json_pointer` is specified, the JSON will be traversed to that sub-object before being parsed as a taxonomy.
 
-4. `Taxonomy.from_phyloxml(value: &str)`: loads a Taxonomy from a PhyloXML-encoded string. **Experimental**
+4. `Taxonomy.from_dict(value: dict)`: loads a Taxonomy from an already-parsed JSON object (e.g. the output of `json.load`) without serializing it to a string first. Supports the same tree and node_link_data formats as `from_json`. To load a sub-object, index into the `dict` before passing it in.
 
-5. `Taxonomy.from_gtdb(value: &str)`: loads a Taxonomy from a GTDB-encoded string. **Experimental**
+5. `Taxonomy.from_phyloxml(value: &str)`: loads a Taxonomy from a PhyloXML-encoded string. **Experimental**
+
+6. `Taxonomy.from_gtdb(value: &str)`: loads a Taxonomy from a GTDB-encoded string. **Experimental**
 
 ### Exporting a taxonomy
 
