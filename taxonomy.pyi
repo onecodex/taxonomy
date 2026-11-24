@@ -155,7 +155,11 @@ class Taxonomy:
         ...
 
     def descendants(self, tax_id: str) -> List[TaxonomyNode]:
-        """Return a list of all child taxonomy nodes from the node id provided."""
+        """
+        Return a list of all taxonomy nodes below the node id provided, not
+        including that node itself. Sorted by tax ID as a string (so "10"
+        comes before "2").
+        """
         ...
 
     def descendant_ids(self, tax_id: str) -> List[str]:
@@ -170,8 +174,8 @@ class Taxonomy:
 
     def lineage(self, tax_id: str) -> List[TaxonomyNode]:
         """
-        Return a list of all the parent taxonomy nodes of the node id provided
-        (including that node itself).
+        Return a list of the node id provided and all of its parent taxonomy
+        nodes, ordered from that node (first) up to the root (last).
         """
         ...
 
