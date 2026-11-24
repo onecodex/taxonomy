@@ -485,6 +485,22 @@ mod tests {
     }
 
     #[test]
+    fn descendants_of_unknown_id_is_an_error() {
+        let tax = create_test_taxonomy();
+        assert!(tax.descendants("unknown").is_err());
+        assert!(tax.traverse("unknown").is_err());
+    }
+
+    #[test]
+    fn contains() {
+        let tax = create_test_taxonomy();
+        assert!(tax.contains("562"));
+        assert!(!tax.contains("unknown"));
+        assert!(Taxonomy::<InternalIndex>::contains(&tax, 5));
+        assert!(!Taxonomy::<InternalIndex>::contains(&tax, 6));
+    }
+
+    #[test]
     fn can_find_all_by_name() {
         let tax = create_test_taxonomy();
         let res = tax.find_all_by_name("Bacteria");

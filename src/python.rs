@@ -502,7 +502,7 @@ impl Taxonomy {
     ///
     /// Add a new node to the tree at the parent provided.
     fn add_node(&mut self, parent_id: &str, tax_id: &str, name: &str, rank: &str) -> PyResult<()> {
-        if self.node(tax_id).is_some() {
+        if self.tax.contains(tax_id) {
             return Err(PyErr::new::<TaxonomyError, _>(format!(
                 "A node with tax id {} already exists",
                 tax_id
@@ -603,7 +603,7 @@ impl Taxonomy {
     }
 
     fn __contains__(&self, tax_id: &str) -> PyResult<bool> {
-        Ok(self.tax.to_internal_index(tax_id).is_ok())
+        Ok(self.tax.contains(tax_id))
     }
 
     fn __iter__(slf: PyRefMut<Self>, py: Python<'_>) -> PyResult<TaxonomyIterator> {

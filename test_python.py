@@ -467,6 +467,16 @@ def test_ncbi_children(ncbi_tax: Taxonomy):
     assert children[0].id == "562"
 
 
+def test_ncbi_contains(ncbi_tax: Taxonomy):
+    assert "562" in ncbi_tax
+    assert "unknown" not in ncbi_tax
+
+
+def test_ncbi_descendants_unknown_id(ncbi_tax: Taxonomy):
+    with pytest.raises(TaxonomyError):
+        ncbi_tax.descendants("unknown")
+
+
 def test_ncbi_lineage(ncbi_tax: Taxonomy):
     lineage = ncbi_tax.lineage("562")
     assert len(lineage) == 9
