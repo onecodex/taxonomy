@@ -85,7 +85,11 @@ class Taxonomy:
 
     @classmethod
     def from_newick(cls, value: str) -> "Taxonomy":
-        """Load a Taxonomy from a Newick-encoded string."""
+        """
+        Load a Taxonomy from a Newick-encoded string. Node labels are stored as
+        names; each node's tax ID is its position in the tree (the root is "0").
+        Use `find_all_by_name` to look nodes up by label.
+        """
         ...
 
     @classmethod
@@ -114,7 +118,10 @@ class Taxonomy:
         ...
 
     def to_newick(self) -> bytes:
-        """Export a Taxonomy as a Newick-encoded byte string."""
+        """
+        Export a Taxonomy as a Newick-encoded byte string, labelling each node
+        with its name (whitespace replaced with underscores).
+        """
         ...
 
     def to_ncbi(self, output_dir: str) -> None:

@@ -246,7 +246,8 @@ impl Taxonomy {
     /// from_newick(cls, value: str)
     /// --
     ///
-    /// Load a Taxonomy from a Newick-encoded string.
+    /// Load a Taxonomy from a Newick-encoded string. Node labels are stored as names; each
+    /// node's tax ID is its position in the tree (the root is "0").
     #[classmethod]
     fn from_newick(_cls: &Bound<'_, PyType>, value: &str) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
@@ -332,7 +333,8 @@ impl Taxonomy {
     /// to_newick(self)
     /// --
     ///
-    /// Export a Taxonomy as a Newick-encoded byte string.
+    /// Export a Taxonomy as a Newick-encoded byte string, labelling each node with its name
+    /// (whitespace replaced with underscores).
     fn to_newick(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut bytes = Vec::new();
         py_try!(newick::save(
