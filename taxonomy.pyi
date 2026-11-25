@@ -85,7 +85,11 @@ class Taxonomy:
 
     @classmethod
     def from_newick(cls, value: str) -> "Taxonomy":
-        """Load a Taxonomy from a Newick-encoded string."""
+        """
+        Load a Taxonomy from a Newick-encoded string. Node labels are stored as
+        names; each node's tax ID is its position in the tree (the root is "0").
+        Use `find_all_by_name` to look nodes up by label.
+        """
         ...
 
     @classmethod
@@ -114,7 +118,10 @@ class Taxonomy:
         ...
 
     def to_newick(self) -> bytes:
-        """Export a Taxonomy as a Newick-encoded byte string."""
+        """
+        Export a Taxonomy as a Newick-encoded byte string, labelling each node
+        with its name (whitespace replaced with underscores).
+        """
         ...
 
     def to_ncbi(self, output_dir: str) -> None:
@@ -155,13 +162,36 @@ class Taxonomy:
         ...
 
     def descendants(self, tax_id: str) -> List[TaxonomyNode]:
-        """Return a list of all child taxonomy nodes from the node id provided."""
+        """
+        Return a list of all taxonomy nodes below the node id provided, not
+        including that node itself, in depth-first order: each node comes
+        before all of its own descendants.
+        """
+        ...
+
+    def descendant_ids(self, tax_id: str) -> List[str]:
+        """
+        Return a list of the IDs of all taxonomy nodes below the node id
+        provided, not including that node itself, in depth-first order: each
+        node comes before all of its own descendants. Equivalent to
+        `[n.id for n in tax.descendants(tax_id)]`, but faster since no
+        `TaxonomyNode` objects are built.
+        """
         ...
 
     def lineage(self, tax_id: str) -> List[TaxonomyNode]:
         """
-        Return a list of all the parent taxonomy nodes of the node id provided
-        (including that node itself).
+        Return a list of the node id provided and all of its parent taxonomy
+        nodes, ordered from that node (first) up to the root (last).
+        """
+        ...
+
+    def lineage_ids(self, tax_id: str) -> List[str]:
+        """
+        Return a list of the IDs of the node id provided and all of its parent
+        taxonomy nodes, ordered from that node (first) up to the root (last).
+        Equivalent to `[n.id for n in tax.lineage(tax_id)]`, but faster since
+        no `TaxonomyNode` objects are built.
         """
         ...
 

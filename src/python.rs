@@ -165,29 +165,38 @@ pub struct Taxonomy {
 /// Some private fns we don't want to share in Python but that make the Python code easier to
 /// write
 impl Taxonomy {
-    pub(crate) fn get_name<'t>(&'t self, tax_id: &'t str) -> PyResult<&'t str> {
-        let name = py_try!(self.tax.name(tax_id));
-        Ok(name)
-    }
-
-    pub(crate) fn get_rank(&self, tax_id: &str) -> PyResult<String> {
-        let rank = py_try!(self.tax.rank(tax_id)).to_string();
-        Ok(rank)
-    }
-
     pub(crate) fn as_node(&self, tax_id: &str) -> PyResult<TaxonomyNode> {
-        let name = self.get_name(tax_id)?;
-        let rank = self.get_rank(tax_id)?;
-        let parent = py_try!(self.tax.parent(tax_id)).map(|(p, _)| p.to_string());
-        let extra = py_try!(self.tax.data(tax_id));
+        let idx = py_try!(self.tax.to_internal_index(tax_id));
+        self.as_node_at(idx)
+    }
+
+    fn as_node_at(&self, idx: InternalIndex) -> PyResult<TaxonomyNode> {
+        let tax = &self.tax;
+        let name = py_try!(tax.name(idx));
+        let rank = py_try!(tax.rank(idx)).to_string();
+        let parent = match py_try!(tax.parent(idx)) {
+            Some((p, _)) => Some(py_try!(tax.from_internal_index(p)).to_string()),
+            None => None,
+        };
+        let extra = py_try!(tax.data(idx));
 
         Ok(TaxonomyNode {
-            id: tax_id.to_string(),
+            id: py_try!(tax.from_internal_index(idx)).to_string(),
             name: name.to_string(),
             rank,
             extra: (*extra).to_owned(),
             parent,
         })
+    }
+
+    fn lineage_indices(&self, tax_id: &str) -> PyResult<Vec<InternalIndex>> {
+        let idx = py_try!(self.tax.to_internal_index(tax_id));
+        Ok(py_try!(self.tax.lineage(idx)))
+    }
+
+    fn descendant_indices(&self, tax_id: &str) -> PyResult<Vec<InternalIndex>> {
+        let idx = py_try!(self.tax.to_internal_index(tax_id));
+        Ok(py_try!(self.tax.descendants(idx)))
     }
 }
 
@@ -237,7 +246,8 @@ impl Taxonomy {
     /// from_newick(cls, value: str)
     /// --
     ///
-    /// Load a Taxonomy from a Newick-encoded string.
+    /// Load a Taxonomy from a Newick-encoded string. Node labels are stored as names; each
+    /// node's tax ID is its position in the tree (the root is "0").
     #[classmethod]
     fn from_newick(_cls: &Bound<'_, PyType>, value: &str) -> PyResult<Taxonomy> {
         let mut c = Cursor::new(value);
@@ -323,7 +333,8 @@ impl Taxonomy {
     /// to_newick(self)
     /// --
     ///
-    /// Export a Taxonomy as a Newick-encoded byte string.
+    /// Export a Taxonomy as a Newick-encoded byte string, labelling each node with its name
+    /// (whitespace replaced with underscores).
     fn to_newick(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut bytes = Vec::new();
         py_try!(newick::save(
@@ -417,25 +428,57 @@ impl Taxonomy {
     /// descendants(self, tax_id: str)
     /// --
     ///
-    /// Return a list of all child taxonomy nodes from the node id provided.
+    /// Return a list of all taxonomy nodes below the node id provided, not including that
+    /// node itself, in depth-first order: each node comes before all of its own descendants.
     fn descendants(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
-        let res = py_try!(self.tax.descendants(tax_id))
+        let res = self
+            .descendant_indices(tax_id)?
             .into_iter()
-            .map(|tax_id| self.as_node(tax_id))
+            .map(|idx| self.as_node_at(idx))
             .collect::<PyResult<Vec<TaxonomyNode>>>()?;
+        Ok(res)
+    }
+
+    /// descendant_ids(self, tax_id: str)
+    /// --
+    ///
+    /// Return a list of the IDs of all taxonomy nodes below the node id provided, not
+    /// including that node itself, in depth-first order: each node comes before all of its own
+    /// descendants.
+    fn descendant_ids(&self, tax_id: &str) -> PyResult<Vec<String>> {
+        let res = self
+            .descendant_indices(tax_id)?
+            .into_iter()
+            .map(|idx| self.tax.tax_ids[idx].clone())
+            .collect();
         Ok(res)
     }
 
     /// lineage(self, tax_id: str)
     /// --
     ///
-    /// Return a list of all the parent taxonomy nodes of the node id provided
-    /// (including that node itself).
+    /// Return a list of the node id provided and all of its parent taxonomy nodes, ordered
+    /// from that node (first) up to the root (last).
     fn lineage(&self, tax_id: &str) -> PyResult<Vec<TaxonomyNode>> {
-        let res = py_try!(self.tax.lineage(tax_id))
+        let res = self
+            .lineage_indices(tax_id)?
             .into_iter()
-            .map(|tax_id| self.as_node(tax_id))
+            .map(|idx| self.as_node_at(idx))
             .collect::<PyResult<Vec<TaxonomyNode>>>()?;
+        Ok(res)
+    }
+
+    /// lineage_ids(self, tax_id: str)
+    /// --
+    ///
+    /// Return a list of the IDs of the node id provided and all of its parent taxonomy nodes,
+    /// ordered from that node (first) up to the root (last).
+    fn lineage_ids(&self, tax_id: &str) -> PyResult<Vec<String>> {
+        let res = self
+            .lineage_indices(tax_id)?
+            .into_iter()
+            .map(|idx| self.tax.tax_ids[idx].clone())
+            .collect();
         Ok(res)
     }
 
@@ -502,7 +545,7 @@ impl Taxonomy {
     ///
     /// Add a new node to the tree at the parent provided.
     fn add_node(&mut self, parent_id: &str, tax_id: &str, name: &str, rank: &str) -> PyResult<()> {
-        if self.node(tax_id).is_some() {
+        if self.tax.contains(tax_id) {
             return Err(PyErr::new::<TaxonomyError, _>(format!(
                 "A node with tax id {} already exists",
                 tax_id
@@ -603,7 +646,7 @@ impl Taxonomy {
     }
 
     fn __contains__(&self, tax_id: &str) -> PyResult<bool> {
-        Ok(self.tax.to_internal_index(tax_id).is_ok())
+        Ok(self.tax.contains(tax_id))
     }
 
     fn __iter__(slf: PyRefMut<Self>, py: Python<'_>) -> PyResult<TaxonomyIterator> {

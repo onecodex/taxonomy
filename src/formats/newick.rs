@@ -44,7 +44,9 @@ where
             out_buf.push_back(NewickToken::Start);
         } else {
             out_buf.push_back(NewickToken::End);
-            let mut name: String = node.to_string().split_whitespace().collect();
+            let mut name = taxonomy
+                .name(node.clone())?
+                .replace(char::is_whitespace, "_");
             if let Some((_, dist)) = taxonomy.parent(node)? {
                 if dist > 0.0 {
                     name.push(':');
@@ -82,16 +84,18 @@ where
 
 /// Read Newick format into a Taxonomy object out of a `reader`.
 ///
+/// Node labels are stored as names. Newick labels are optional and often repeated, so each
+/// node's tax ID is its position in the tree (the root is "0").
+///
 /// Still somewhat experimental and may not support all Newick features.
 pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
-    // TODO: handle empty tax ids?
     // TODO: handle quoted labels
     // TODO: handle ending `;`
     let mut buffer: Vec<u8> = Vec::new();
     reader.read_to_end(&mut buffer)?;
 
     // make the root node explicitly first
-    let mut tax_ids: Vec<String> = vec!["".to_string()];
+    let mut names: Vec<String> = vec!["".to_string()];
     let mut parent_ids: Vec<usize> = vec![0];
     let mut dists: Vec<f32> = vec![1.];
     let mut cur_lineage: Vec<usize> = Vec::new();
@@ -101,20 +105,20 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
         match buffer[cur_pos] {
             b'(' => {
                 // make a new node
-                tax_ids.push("".to_string());
+                names.push("".to_string());
                 parent_ids.push(*cur_lineage.last().unwrap_or(&0));
                 dists.push(1.);
-                cur_lineage.push(tax_ids.len() - 1);
+                cur_lineage.push(names.len() - 1);
                 cur_pos += 1;
             }
             b',' => {
                 // finish up with the current node
                 cur_lineage.pop();
                 // make a new node
-                tax_ids.push("".to_string());
+                names.push("".to_string());
                 parent_ids.push(*cur_lineage.last().unwrap_or(&0));
                 dists.push(1.);
-                cur_lineage.push(tax_ids.len() - 1);
+                cur_lineage.push(names.len() - 1);
                 cur_pos += 1;
             }
             b')' => {
@@ -141,7 +145,7 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
                     })?
                     .trim_end_matches(';')
                     .splitn(2, |x| x == ':');
-                tax_ids[cur_node] = chunk_iter.next().unwrap_or("").to_string();
+                names[cur_node] = chunk_iter.next().unwrap_or("").to_string();
                 dists[cur_node] = chunk_iter.next().unwrap_or("1").parse().map_err(|e| {
                     Error::new(ErrorKind::ImportError {
                         line: 0,
@@ -153,7 +157,8 @@ pub fn load<R: Read>(reader: &mut R) -> TaxonomyResult<GeneralTaxonomy> {
         }
     }
 
-    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, None, None, Some(dists), None)
+    let tax_ids = (0..names.len()).map(|i| i.to_string()).collect();
+    GeneralTaxonomy::from_arrays(tax_ids, parent_ids, Some(names), None, Some(dists), None)
 }
 
 #[cfg(test)]
@@ -161,36 +166,82 @@ mod tests {
     use super::*;
     use crate::taxonomy::Taxonomy;
 
+    const HOMARIDAE: &[u8] = b"(Nephrops_norvegicus:0.1,Homarinus_capensis:0.2,(Homarus_americanus:0.3,Homarus_gammarus:0.4)Homarus:0.5)Homaridae;";
+
+    fn id_of<'t>(tax: &'t GeneralTaxonomy, name: &str) -> &'t str {
+        let ids = tax.find_all_by_name(name);
+        assert_eq!(ids.len(), 1, "expected exactly one node named {}", name);
+        ids[0]
+    }
+
     #[test]
     fn test_write_newick() {
-        let newick_str = b"((((((((56812:1)62322:1)22:1)135622:1,((((765909:1)61598:1)53452:1)1046:1)135613:1)1236:1)1224:1)2:1)131567:1)1;";
-        let tax = load(&mut newick_str.as_ref()).unwrap();
+        let tax = load(&mut HOMARIDAE.as_ref()).unwrap();
 
-        // The leaves are swapped, the tree is still ok but the output doesn't match the original string
-        // let mut bytes = Vec::new();
-        // save(&mut bytes, &tax, None).unwrap();
-        // println!("{:?}", std::str::from_utf8(&bytes));
-        // assert_eq!(bytes, newick_str);
-
-        // try saving a subtree
         let mut bytes = Vec::new();
-        save(&mut bytes, &tax, Some("53452")).unwrap();
-        assert_eq!(bytes, b"((765909:1)61598:1)53452:1;");
+        save(&mut bytes, &tax, Some(id_of(&tax, "Homarus"))).unwrap();
+        assert_eq!(
+            bytes,
+            b"(Homarus_gammarus:0.4,Homarus_americanus:0.3)Homarus:0.5;"
+        );
+    }
+
+    #[test]
+    fn test_write_newick_replaces_whitespace_in_names() {
+        let tax = GeneralTaxonomy::from_arrays(
+            vec!["0".to_string(), "1".to_string()],
+            vec![0, 0],
+            Some(vec![
+                "Homaridae".to_string(),
+                "Homarus americanus".to_string(),
+            ]),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        let mut bytes = Vec::new();
+        save(&mut bytes, &tax, None::<&str>).unwrap();
+        assert_eq!(bytes, b"(Homarus_americanus:1)Homaridae;");
     }
 
     #[test]
     fn test_load_newick() {
-        let newick_str = b"(())";
-        let tax = load(&mut newick_str.as_ref()).unwrap();
+        let tax = load(&mut b"(())".as_ref()).unwrap();
         assert_eq!(Taxonomy::<&str>::len(&tax), 3);
 
-        let newick_str = b"(A,B,(C,D));";
-        let tax = load(&mut newick_str.as_ref()).unwrap();
+        let tax = load(
+            &mut b"(Homarus_americanus,Homarus_gammarus,(Nephrops_norvegicus,Metanephrops_japonicus));"
+                .as_ref(),
+        )
+        .unwrap();
         assert_eq!(Taxonomy::<&str>::len(&tax), 6);
 
-        let newick_str = b"(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;";
-        let tax = load(&mut newick_str.as_ref()).unwrap();
-        assert_eq!(tax.parent("D").unwrap(), Some(("E", 0.4)));
-        assert_eq!(tax.parent("E").unwrap(), Some(("F", 0.5)));
+        let tax = load(&mut HOMARIDAE.as_ref()).unwrap();
+        assert_eq!(Taxonomy::<&str>::root(&tax), "0");
+        assert_eq!(tax.name("0").unwrap(), "Homaridae");
+        assert!(!tax.contains("Homarus_gammarus"));
+        assert_eq!(
+            tax.parent(id_of(&tax, "Homarus_gammarus")).unwrap(),
+            Some((id_of(&tax, "Homarus"), 0.4))
+        );
+        assert_eq!(
+            tax.parent(id_of(&tax, "Homarus")).unwrap(),
+            Some((id_of(&tax, "Homaridae"), 0.5))
+        );
+    }
+
+    #[test]
+    fn test_load_newick_gives_unlabelled_and_duplicate_nodes_unique_ids() {
+        let tax = load(
+            &mut b"((Homarus_americanus,Homarus_americanus),(Nephrops_norvegicus,Metanephrops_japonicus))Homaridae;"
+                .as_ref(),
+        )
+        .unwrap();
+        assert_eq!(Taxonomy::<&str>::len(&tax), 7);
+        assert_eq!(tax.find_all_by_name("").len(), 2);
+        assert_eq!(tax.find_all_by_name("Homarus_americanus").len(), 2);
+        tax.validate_uniqueness().unwrap();
     }
 }

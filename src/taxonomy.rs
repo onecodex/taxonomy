@@ -1,4 +1,4 @@
-use crate::errors::TaxonomyResult;
+use crate::errors::{Error, ErrorKind, TaxonomyResult};
 use crate::rank::TaxRank;
 use serde_json::Value;
 use std::borrow::Cow;
@@ -14,6 +14,13 @@ where
 {
     /// Returns the root node of the entire tree.
     fn root(&'t self) -> T;
+
+    /// Returns true if the taxonomy has a node with the given tax_id, i.e. if
+    /// [Taxonomy::name] returns `Ok` for it. This is the one way to check whether a tax ID
+    /// exists; implementations shouldn't override it.
+    fn contains(&'t self, tax_id: T) -> bool {
+        self.name(tax_id).is_ok()
+    }
 
     /// Returns a [Vec] of all the direct children IDs of the given tax_id.
     fn children(&'t self, tax_id: T) -> TaxonomyResult<Vec<T>>;
@@ -94,7 +101,7 @@ where
         Ok(common)
     }
 
-    /// Returns the name of the tax_id provided.
+    /// Returns the name of the tax_id provided, or an error if the tax_id isn't in the taxonomy.
     fn name(&'t self, tax_id: T) -> TaxonomyResult<&str>;
 
     /// Returns the additional data at the given tax id node
@@ -114,6 +121,9 @@ where
     where
         Self: Sized,
     {
+        if !self.contains(node.clone()) {
+            return Err(Error::new(ErrorKind::NoSuchTaxId(node.to_string())));
+        }
         Ok(TaxonomyIterator::new(self, node))
     }
 
@@ -248,12 +258,16 @@ pub(crate) mod tests {
                 2 => "Bacteria",
                 1224 => "Proteobacteria",
                 1236 => "Gammaproteobacteria",
+                135622 => "Alteromonadales",
+                22 => "Shewanella",
+                62322 => "Shewanella baltica",
+                56812 => "Shewanella frigidimarina",
                 135613 => "Chromatiales",
                 1046 => "Chromatiaceae",
                 53452 => "Lamprocystis",
                 61598 => "Lamprocystis purpurea",
                 765909 => "Lamprocystis purpurea DSM 4197",
-                _ => "",
+                _ => return Err(Error::new(ErrorKind::NoSuchTaxId(tax_id.to_string()))),
             })
         }
 
@@ -277,6 +291,21 @@ pub(crate) mod tests {
         assert_eq!(tax.root(), 1);
         assert_eq!(tax.len(), 14);
         assert_eq!(tax.is_empty(), false);
+    }
+
+    #[test]
+    fn test_contains() {
+        let tax = MockTax;
+        assert!(tax.contains(1));
+        assert!(tax.contains(56812));
+        assert!(!tax.contains(999));
+    }
+
+    #[test]
+    fn test_traverse_unknown_node() {
+        let tax = MockTax;
+        assert!(tax.traverse(999).is_err());
+        assert!(tax.descendants(999).is_err());
     }
 
     #[test]

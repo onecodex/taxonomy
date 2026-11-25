@@ -36,7 +36,7 @@ Note that Taxonomy IDs in NCBI format are integers, but they're converted to str
 
 Taxonomy can be loaded from a variety of sources. 
 
-1. `Taxonomy.from_newick(value: str)`: loads a Taxonomy from a Newick-encoded string.
+1. `Taxonomy.from_newick(value: str)`: loads a Taxonomy from a Newick-encoded string. Node labels are stored as names, and each node's tax ID is its position in the tree (the root is `"0"`), since Newick labels are optional and often repeated. Use `tax.find_all_by_name(label)` to look nodes up by label.
 
 2. `Taxonomy.from_ncbi(ncbi_filder: str)`: loads a Taxonomy from a pair of NCBI dump files. The folder needs to contain the individual files in the NCBI taxonomy directory (e.g. nodes.dmp and names.dmp).
 
@@ -51,7 +51,7 @@ of the tree or node_link_data types and will be automatically detected (more det
 
 Assuming that the taxonomy has been instantiated as a variable named `tax`.
 
-1. `tax.to_newick()`: exports a Taxonomy as a Newick-encoded byte string.
+1. `tax.to_newick()`: exports a Taxonomy as a Newick-encoded byte string, labelling each node with its name (whitespace replaced with underscores).
 2. `tax.to_json_tree()`: exports a Taxonomy as a JSON-encoded byte string in a tree format
 3. `tax.to_json_node_links()`: exports a Taxonomy as a JSON-encoded byte string in a node links format
 
@@ -117,9 +117,17 @@ Returns all direct nodes below the given tax id.
 Returns all nodes below the given tax id. 
 Equivalent to running `tax.children` recursively on the initial result of `tax.children(tax_id)`.
 
+#### `tax.descendant_ids(tax_id: str) -> List[str]`
+
+Same as `descendants` but returns only the tax ids. Faster on large trees since no `TaxonomyNode` objects are built.
+
 #### `tax.lineage(tax_id: str) -> List[TaxonomyNode]`
 
 Returns all nodes above the given tax id, including itself.
+
+#### `tax.lineage_ids(tax_id: str) -> List[str]`
+
+Same as `lineage` but returns only the tax ids. Faster on large trees since no `TaxonomyNode` objects are built.
 
 #### `tax.parents(tax_id: str) -> List[TaxonomyNode]`
 

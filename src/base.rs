@@ -391,13 +391,14 @@ impl<'t> Taxonomy<'t, InternalIndex> for GeneralTaxonomy {
         }
     }
 
+    /// Returns descendants in depth-first order: each node comes before all of its own
+    /// descendants.
     fn descendants(&'t self, tax_id: InternalIndex) -> TaxonomyResult<Vec<InternalIndex>> {
-        let children: HashSet<InternalIndex> = self
+        Ok(self
             .traverse(tax_id)?
+            .filter(|(n, preorder)| *preorder && *n != tax_id)
             .map(|(n, _)| n)
-            .filter(|n| *n != tax_id)
-            .collect();
-        Ok(children.into_iter().collect())
+            .collect())
     }
 
     fn parent(&'t self, idx: InternalIndex) -> TaxonomyResult<Option<(InternalIndex, f32)>> {
@@ -482,6 +483,36 @@ mod tests {
         assert_eq!(tax.name("562").unwrap(), "Escherichia coli");
         assert_eq!(tax.rank("562").unwrap(), TaxRank::Species);
         assert_eq!(tax.parent("562").unwrap(), Some(("2", 1.0)));
+    }
+
+    #[test]
+    fn descendants_of_unknown_id_is_an_error() {
+        let tax = create_test_taxonomy();
+        assert!(tax.descendants("unknown").is_err());
+        assert!(tax.traverse("unknown").is_err());
+    }
+
+    #[test]
+    fn contains() {
+        let tax = create_test_taxonomy();
+        assert!(tax.contains("562"));
+        assert!(!tax.contains("unknown"));
+        assert!(Taxonomy::<InternalIndex>::contains(&tax, 5));
+        assert!(!Taxonomy::<InternalIndex>::contains(&tax, 6));
+    }
+
+    #[test]
+    fn internal_index_descendants_are_depth_first() {
+        let tax = create_test_taxonomy();
+        let descendants = Taxonomy::<InternalIndex>::descendants(&tax, 0).unwrap();
+        assert_eq!(descendants.len(), 5);
+        for (i, &idx) in descendants.iter().enumerate() {
+            let parent = Taxonomy::<InternalIndex>::parent(&tax, idx)
+                .unwrap()
+                .unwrap()
+                .0;
+            assert!(parent == 0 || descendants[..i].contains(&parent));
+        }
     }
 
     #[test]

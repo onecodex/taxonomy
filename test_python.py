@@ -129,7 +129,15 @@ def json_tax():
 
 @pytest.fixture
 def newick_tax():
-    return Taxonomy.from_newick("(A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F;")
+    return Taxonomy.from_newick(
+        "(Nephrops_norvegicus:0.1,Homarinus_capensis:0.2,"
+        "(Homarus_americanus:0.3,Homarus_gammarus:0.4)Homarus:0.5)Homaridae;"
+    )
+
+
+def newick_id(tax: Taxonomy, name: str) -> str:
+    (node,) = tax.find_all_by_name(name)
+    return node.id
 
 
 @pytest.fixture
@@ -284,133 +292,196 @@ def test_node_link_array_errors(value, message, load):
 
 def test_newick_root(newick_tax: Taxonomy):
     root = newick_tax.root
-    assert root.id == "F"
+    assert root.id == "0"
+    assert root.name == "Homaridae"
     assert root.parent is None
 
 
+def test_newick_labels_are_names_not_ids(newick_tax: Taxonomy):
+    assert newick_tax.node("Homarus_gammarus") is None
+    assert "Homarus_gammarus" not in newick_tax
+    assert sorted(newick_tax) == ["0", "1", "2", "3", "4", "5"]
+
+
 def test_newick_find_node_by_id(newick_tax: Taxonomy):
-    node = newick_tax.node("A")
-    assert node == newick_tax.node("A")
+    node = newick_tax.node(newick_id(newick_tax, "Nephrops_norvegicus"))
     assert node is not None
-    assert node.id == "A"
-    assert node.parent == "F"
+    assert node.name == "Nephrops_norvegicus"
+    assert node.parent == newick_id(newick_tax, "Homaridae")
 
-    node = newick_tax.node("D")
+    node = newick_tax.node(newick_id(newick_tax, "Homarus_gammarus"))
     assert node is not None
-    assert node.id == "D"
-    assert node.parent == "E"
+    assert node.name == "Homarus_gammarus"
+    assert node.parent == newick_id(newick_tax, "Homarus")
 
-    node = newick_tax.node("unknown")
-    assert node is None
+    assert newick_tax.node("unknown") is None
 
 
 def test_newick_index(newick_tax: Taxonomy):
-    node = newick_tax["A"]
-    assert node.id == "A"
-    assert node.parent == "F"
+    node = newick_tax[newick_id(newick_tax, "Nephrops_norvegicus")]
+    assert node.name == "Nephrops_norvegicus"
+    assert node.parent == newick_id(newick_tax, "Homaridae")
 
     with pytest.raises(TaxonomyError):
         _ = newick_tax["unknown"]
 
 
 def test_newick_find_all_by_name(newick_tax: Taxonomy):
-    nodes = newick_tax.find_all_by_name("A")
-    assert nodes == []
+    assert [n.name for n in newick_tax.find_all_by_name("Homarus")] == ["Homarus"]
+    assert newick_tax.find_all_by_name("Metanephrops_japonicus") == []
 
 
 def test_newick_parent(newick_tax: Taxonomy):
-    parent = newick_tax.parent("D")
+    parent = newick_tax.parent(newick_id(newick_tax, "Homarus_gammarus"))
     assert parent is not None
-    assert parent.id == "E"
+    assert parent.name == "Homarus"
 
 
 def test_newick_parent_with_distance(newick_tax: Taxonomy):
-    parent, distance = newick_tax.parent_with_distance("D")
+    parent, distance = newick_tax.parent_with_distance(
+        newick_id(newick_tax, "Homarus_gammarus")
+    )
     assert parent is not None
     assert distance is not None
-    assert parent.id == "E"
+    assert parent.name == "Homarus"
     assert abs(distance - 0.4) < 1e-6
 
 
 def test_newick_children(newick_tax: Taxonomy):
-    children = newick_tax.children("E")
-    assert len(children) == 2
-    assert children[0].id == "C"
-    assert children[1].id == "D"
+    children = newick_tax.children(newick_id(newick_tax, "Homarus"))
+    assert [n.name for n in children] == ["Homarus_americanus", "Homarus_gammarus"]
 
 
 def test_newick_lineage(newick_tax: Taxonomy):
-    lineage = newick_tax.lineage("D")
-    assert len(lineage) == 3
-    assert lineage[0].id == "D"
-    assert lineage[1].id == "E"
-    assert lineage[2].id == "F"
+    lineage = newick_tax.lineage(newick_id(newick_tax, "Homarus_gammarus"))
+    assert [n.name for n in lineage] == ["Homarus_gammarus", "Homarus", "Homaridae"]
 
 
 def test_newick_parents(newick_tax: Taxonomy):
-    lineage = newick_tax.parents("D")
-    assert len(lineage) == 2
-    assert lineage[0].id == "E"
-    assert lineage[1].id == "F"
+    parents = newick_tax.parents(newick_id(newick_tax, "Homarus_gammarus"))
+    assert [n.name for n in parents] == ["Homarus", "Homaridae"]
 
 
 def test_newick_lca(newick_tax: Taxonomy):
-    lca = newick_tax.lca("A", "D")
+    lca = newick_tax.lca(
+        newick_id(newick_tax, "Nephrops_norvegicus"),
+        newick_id(newick_tax, "Homarus_gammarus"),
+    )
     assert lca is not None
-    assert lca.id == "F"
+    assert lca.name == "Homaridae"
 
 
 def test_newick_prune(newick_tax: Taxonomy):
-    new_tax = newick_tax.prune(remove=["E"])
-    assert new_tax.node("D") is None
-    assert new_tax.node("E") is None
+    homarus = newick_id(newick_tax, "Homarus")
+    gammarus = newick_id(newick_tax, "Homarus_gammarus")
+
+    new_tax = newick_tax.prune(remove=[homarus])
+    assert new_tax.node(gammarus) is None
+    assert new_tax.node(homarus) is None
     assert len(new_tax) == 3
 
-    new_tax = newick_tax.prune(keep=["E", "D"])
+    new_tax = newick_tax.prune(keep=[homarus, gammarus])
     assert len(new_tax) == 3
-    assert new_tax.node("F") is not None
+    assert new_tax.node(newick_id(newick_tax, "Homaridae")) is not None
 
 
 def test_newick_remove(newick_tax: Taxonomy):
-    newick_tax.remove_node("E")
-    assert newick_tax.node("D") is not None
-    assert newick_tax.node("E") is None
+    homarus = newick_id(newick_tax, "Homarus")
+    gammarus = newick_id(newick_tax, "Homarus_gammarus")
+    newick_tax.remove_node(homarus)
+    assert newick_tax.node(gammarus) is not None
+    assert newick_tax.node(homarus) is None
     assert len(newick_tax) == 5
 
 
 def test_newick_add(newick_tax: Taxonomy):
-    newick_tax.add_node("D", "G", "something", "species")
-    node = newick_tax["G"]
-    assert node.parent == "D"
+    gammarus = newick_id(newick_tax, "Homarus_gammarus")
+    newick_tax.add_node(gammarus, "100", "Homarus gammarus (Norway)", "no rank")
+    assert newick_tax["100"].parent == gammarus
 
-    newick_tax.add_node("G", "H", "something else", "species")
-    node = newick_tax["H"]
-    assert node.parent == "G"
+    newick_tax.add_node("100", "101", "Homarus gammarus (Oslofjord)", "no rank")
+    assert newick_tax["101"].parent == "100"
 
 
 def test_newick_edit_node(newick_tax: Taxonomy):
-    newick_tax.edit_node("D", parent_distance=3)
-    _, distance = newick_tax.parent_with_distance("D")
+    gammarus = newick_id(newick_tax, "Homarus_gammarus")
+    newick_tax.edit_node(gammarus, parent_distance=3)
+    _, distance = newick_tax.parent_with_distance(gammarus)
     assert distance == 3
 
 
 def test_newick_can_clone(newick_tax: Taxonomy):
+    homarus = newick_id(newick_tax, "Homarus")
+    gammarus = newick_id(newick_tax, "Homarus_gammarus")
     tax2 = newick_tax.clone()
-    newick_tax.remove_node("E")
+    newick_tax.remove_node(homarus)
 
-    assert newick_tax.node("D") is not None
-    assert newick_tax.node("E") is None
+    assert newick_tax.node(gammarus) is not None
+    assert newick_tax.node(homarus) is None
     assert len(newick_tax) == 5
 
-    assert tax2.node("D") is not None
-    assert tax2.node("E") is not None
+    assert tax2.node(gammarus) is not None
+    assert tax2.node(homarus) is not None
     assert len(tax2) == 6
 
 
-def test_newick_output_uses_tax_ids(newick_tax: Taxonomy):
+def test_newick_output_uses_names(newick_tax: Taxonomy):
     res = newick_tax.to_newick().decode("utf-8")
-    for tax_id in ["A", "B", "C", "D", "E", "F"]:
-        assert tax_id in res
+    for name in [
+        "Nephrops_norvegicus",
+        "Homarinus_capensis",
+        "Homarus_americanus",
+        "Homarus_gammarus",
+        "Homarus",
+        "Homaridae",
+    ]:
+        assert name in res
+
+
+def test_newick_output_replaces_spaces_in_names(newick_tax: Taxonomy):
+    homarus = newick_id(newick_tax, "Homarus")
+    newick_tax.edit_node(homarus, name="Homarus Weber 1795")
+    assert "Homarus_Weber_1795" in newick_tax.to_newick().decode("utf-8")
+
+
+def test_newick_round_trip(newick_tax: Taxonomy):
+    tax2 = Taxonomy.from_newick(newick_tax.to_newick().decode("utf-8"))
+    assert sorted(n.name for n in [tax2[i] for i in tax2]) == sorted(
+        n.name for n in [newick_tax[i] for i in newick_tax]
+    )
+    gammarus = newick_id(tax2, "Homarus_gammarus")
+    assert [n.name for n in tax2.lineage(gammarus)] == [
+        "Homarus_gammarus",
+        "Homarus",
+        "Homaridae",
+    ]
+
+
+def test_newick_unlabelled_nodes_get_unique_ids():
+    tax = Taxonomy.from_newick(
+        "((Homarus_americanus,Homarus_gammarus),"
+        "(Nephrops_norvegicus,Metanephrops_japonicus))Homaridae;"
+    )
+    assert len(tax) == 7
+    descendant_ids = tax.descendant_ids(tax.root.id)
+    assert len(descendant_ids) == len(set(descendant_ids)) == 6
+    assert sorted(n.name for n in tax.descendants(tax.root.id)) == [
+        "",
+        "",
+        "Homarus_americanus",
+        "Homarus_gammarus",
+        "Metanephrops_japonicus",
+        "Nephrops_norvegicus",
+    ]
+    assert "((" in tax.to_newick().decode("utf-8")
+
+
+def test_newick_duplicate_labels_are_separate_nodes():
+    tax = Taxonomy.from_newick("(Homarus_americanus,Homarus_americanus)Homarus;")
+    nodes = tax.find_all_by_name("Homarus_americanus")
+    assert len(nodes) == 2
+    assert nodes[0].id != nodes[1].id
+    assert len(tax.descendant_ids(tax.root.id)) == 2
 
 
 def test_ncbi_root(ncbi_tax: Taxonomy):
@@ -467,12 +538,53 @@ def test_ncbi_children(ncbi_tax: Taxonomy):
     assert children[0].id == "562"
 
 
+def test_ncbi_contains(ncbi_tax: Taxonomy):
+    assert "562" in ncbi_tax
+    assert "unknown" not in ncbi_tax
+
+
+def test_ncbi_descendants_unknown_id(ncbi_tax: Taxonomy):
+    with pytest.raises(TaxonomyError):
+        ncbi_tax.descendants("unknown")
+
+
+def test_ncbi_descendant_ids(ncbi_tax: Taxonomy):
+    descendant_ids = ncbi_tax.descendant_ids("543")
+    assert descendant_ids == [n.id for n in ncbi_tax.descendants("543")]
+    assert "562" in descendant_ids
+    assert "543" not in descendant_ids
+
+
+def test_ncbi_descendants_are_depth_first(ncbi_tax: Taxonomy):
+    seen = {"543"}
+    for node in ncbi_tax.descendants("543"):
+        assert node.parent in seen
+        seen.add(node.id)
+
+
+def test_ncbi_descendant_ids_unknown_id(ncbi_tax: Taxonomy):
+    with pytest.raises(TaxonomyError):
+        ncbi_tax.descendant_ids("unknown")
+
+
 def test_ncbi_lineage(ncbi_tax: Taxonomy):
     lineage = ncbi_tax.lineage("562")
     assert len(lineage) == 9
     assert lineage[0].id == "562"
     assert lineage[1].id == "561"
     assert lineage[-1].id == "1"
+
+
+def test_ncbi_lineage_ids(ncbi_tax: Taxonomy):
+    lineage_ids = ncbi_tax.lineage_ids("562")
+    assert lineage_ids == [n.id for n in ncbi_tax.lineage("562")]
+    assert lineage_ids[0] == "562"
+    assert lineage_ids[-1] == "1"
+
+
+def test_ncbi_lineage_ids_unknown_id(ncbi_tax: Taxonomy):
+    with pytest.raises(TaxonomyError):
+        ncbi_tax.lineage_ids("unknown")
 
 
 def test_ncbi_parents(ncbi_tax: Taxonomy):
